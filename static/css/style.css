@@ -1,0 +1,7 @@
+/* SmartPark - Global overrides */
+*, *::before, *::after { box-sizing: border-box; }
+@media print {
+    nav, #toast-container { display: none !important; }
+    body { background: white !important; }
+    #ticket-card { box-shadow: none !important; border: 2px solid #333 !important; }
+}

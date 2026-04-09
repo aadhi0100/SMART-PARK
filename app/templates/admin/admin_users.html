@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}User Management — SmartPark{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <i class="fa-solid fa-users text-blue-600"></i>User Management
+            </h1>
+            <p class="text-slate-500 dark:text-slate-400 mt-1">Manage users, roles, and send broadcasts</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="{{ url_for('admin.admin_waitlist', username=username) }}"
+               class="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-colors text-sm">
+                <i class="fa-solid fa-clock-rotate-left"></i>Waitlist
+            </a>
+            <button onclick="document.getElementById('broadcast-panel').classList.toggle('hidden')"
+                class="inline-flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition-colors text-sm">
+                <i class="fa-solid fa-bullhorn"></i>Broadcast
+            </button>
+            <a href="{{ url_for('admin.admin_create_user', username=username) }}"
+               class="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors text-sm">
+                <i class="fa-solid fa-user-plus"></i>Add User
+            </a>
+        </div>
+    </div>
+
+    <!-- Broadcast Panel -->
+    <div id="broadcast-panel" class="hidden bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-2xl p-5">
+        <h3 class="font-bold text-purple-800 dark:text-purple-300 mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-bullhorn"></i>Broadcast Message to All Users
+        </h3>
+        <div class="flex gap-3">
+            <input type="text" id="broadcast-msg" placeholder="Type your message..."
+                class="flex-1 px-4 py-2.5 bg-white dark:bg-slate-700 border border-purple-200 dark:border-purple-700 rounded-xl text-sm text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-500">
+            <button onclick="sendBroadcast()"
+                class="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl text-sm transition-colors">
+                <i class="fa-solid fa-paper-plane mr-1"></i>Send
+            </button>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
+        <!-- Users Table -->
+        <div class="xl:col-span-2 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                <h3 class="font-bold text-slate-800 dark:text-white">Registered Users</h3>
+                <div class="flex items-center gap-3">
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="text" id="user-search" placeholder="Search users..."
+                            oninput="filterUsers(this.value)"
+                            class="pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <span class="text-xs text-slate-400">{{ users_list|length }} total</span>
+                </div>
+            </div>
+            <table class="w-full">
+                <thead>
+                    <tr class="bg-slate-50 dark:bg-slate-700/50">
+                        <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">User</th>
+                        <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Role</th>
+                        <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Joined</th>
+                        <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                    {% for user in users_list %}
+                    <tr id="user-row-{{ user['id'] }}" class="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                        <td class="px-5 py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                    {{ user['username'][0].upper() }}
+                                </div>
+                                <div>
+                                    <div class="text-sm font-semibold text-slate-800 dark:text-white">{{ user['username'] }}</div>
+                                    <div class="text-xs text-slate-400">#{{ user['id'] }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-5 py-4">
+                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold
+                                {% if user['role'] == 'admin' %}bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400
+                                {% else %}bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400{% endif %}">
+                                <i class="fa-solid {% if user['role'] == 'admin' %}fa-shield-halved{% else %}fa-user{% endif %}"></i>
+                                {{ user['role'].title() }}
+                            </span>
+                        </td>
+                        <td class="px-5 py-4 text-xs text-slate-400">{{ user['created_at'][:10] if user['created_at'] else '—' }}</td>
+                        <td class="px-5 py-4">
+                            {% if user['username'] != 'admin' %}
+                            <div class="flex items-center gap-1.5">
+                                <button onclick="changeRole('{{ user['username'] }}', '{{ 'user' if user['role'] == 'admin' else 'admin' }}')"
+                                    class="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition-colors text-xs" title="{{ 'Make User' if user['role'] == 'admin' else 'Make Admin' }}">
+                                    <i class="fa-solid {% if user['role'] == 'admin' %}fa-user-minus{% else %}fa-user-shield{% endif %}"></i>
+                                </button>
+                                <button onclick="deleteUser('{{ user['username'] }}', {{ user['id'] }})"
+                                    class="p-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 transition-colors text-xs" title="Delete">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                            {% else %}
+                            <span class="text-xs text-slate-400 italic">System Admin</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Right Column -->
+        <div class="space-y-6">
+            <!-- User Stats -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-700">
+                    <h3 class="font-bold text-slate-800 dark:text-white text-sm">Top Users by Bookings</h3>
+                </div>
+                <div class="divide-y divide-slate-100 dark:divide-slate-700">
+                    {% for stat in user_stats[:8] %}
+                    <div class="px-5 py-3 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <div class="w-6 h-6 bg-gradient-to-br from-purple-400 to-blue-400 rounded-md flex items-center justify-center text-white text-xs font-bold">
+                                {{ stat['username'][0].upper() }}
+                            </div>
+                            <span class="text-sm text-slate-700 dark:text-slate-300">{{ stat['username'] }}</span>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs font-bold text-slate-700 dark:text-slate-300">{{ stat['booking_count'] }} bookings</div>
+                            <div class="text-xs text-emerald-600 dark:text-emerald-400">₹{{ stat['total_spent'] | int }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Recent Bookings -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-700">
+                    <h3 class="font-bold text-slate-800 dark:text-white text-sm">Recent Bookings</h3>
+                </div>
+                <div class="divide-y divide-slate-100 dark:divide-slate-700">
+                    {% for b in recent_bookings %}
+                    <div class="px-5 py-3">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-xs font-semibold text-slate-700 dark:text-slate-300">{{ b['username'] }}</div>
+                                <div class="text-xs text-slate-400">{{ b['slot'] }} · {{ b['vehicle'] }}</div>
+                            </div>
+                            <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400">₹{{ b['amount_paid'] | int }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function changeRole(u, role) {
+    if (!confirm(`Change ${u} to ${role}?`)) return;
+    fetch(`/admin/change_role/{{ username }}`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({target_username: u, new_role: role})
+    }).then(r=>r.json()).then(data => {
+        if (data.success) { showToast(data.message, 'success'); setTimeout(()=>location.reload(), 1000); }
+        else showToast(data.message, 'error');
+    });
+}
+function deleteUser(u, id) {
+    if (!confirm(`Delete "${u}" and all their data? This cannot be undone.`)) return;
+    fetch(`/admin/delete_user/{{ username }}`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({target_username: u})
+    }).then(r=>r.json()).then(data => {
+        if (data.success) { document.getElementById('user-row-'+id)?.remove(); showToast(data.message, 'success'); }
+        else showToast(data.message, 'error');
+    });
+}
+function sendBroadcast() {
+    const msg = document.getElementById('broadcast-msg').value.trim();
+    if (!msg) return;
+    fetch(`/admin/broadcast/{{ username }}`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({message: msg})
+    }).then(r=>r.json()).then(data => {
+        showToast(data.message, data.success ? 'success' : 'error');
+        if (data.success) document.getElementById('broadcast-msg').value = '';
+    });
+}
+function filterUsers(q) {
+    const rows = document.querySelectorAll('tbody tr[id^="user-row-"]');
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(q.toLowerCase()) ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}

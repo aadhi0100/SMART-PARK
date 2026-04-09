@@ -1,0 +1,1492 @@
+{% extends "base.html" %}
+{% block title %}Book Parking — SmartPark{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/modern-style.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-wrapper">
+        <!-- Header -->
+        <div class="card-header text-center">
+            <h1 class="card-title">🚗 Book Your Parking Slot</h1>
+            <p class="card-subtitle">Choose from 50 available slots across 5 Chennai locations</p>
+            
+            <!-- Status Badges -->
+            <div class="flex justify-center gap-3 mt-4">
+                {% if is_peak %}
+                <span class="badge badge-warning">
+                    ⚡ Peak Hours ({{ peak_multiplier }}x pricing)
+                </span>
+                {% endif %}
+                {% if loyalty_tier and loyalty_tier.discount > 0 %}
+                <span class="badge badge-success">
+                    🏅 {{ loyalty_tier.name }} - {{ loyalty_tier.discount }}% OFF
+                </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <form method="POST" id="booking-form" class="space-y-6">
+            <!-- Step 1: Location & Slot Selection -->
+            <div class="card slide-up">
+                <div class="card-header">
+                    <h2 class="card-title">📍 Step 1: Choose Location & Slot</h2>
+                </div>
+                
+                <!-- Location Tabs -->
+                <div class="location-grid mb-6">
+                    {% for loc_name, loc in locations.items() %}
+                    {% set availability_pct = (loc.available / 10 * 100) | int %}
+                    <button type="button" onclick="selectLocation('{{ loc_name }}')"
+                            class="location-card {% if loop.first %}active{% endif %}"
+                            data-location="{{ loc_name }}">
+                        <div class="location-name">{{ loc_name }}</div>
+                        <div class="availability-bar">
+                            <div class="availability-fill" style="width: {{ availability_pct }}%"></div>
+                        </div>
+                        <div class="availability-text">{{ loc.available }}/10 available</div>
+                    </button>
+                    {% endfor %}
+                </div>
+                
+                <!-- Slot Grids -->
+                {% for loc_name, loc in locations.items() %}
+                <div class="slot-section {% if not loop.first %}hidden{% endif %}" id="slots-{{ loc_name | replace(' ', '_') }}">
+                    <h3 class="mb-4">Available Slots in {{ loc_name }}</h3>
+                    <div class="slot-grid">
+                        {% for i in range(1, 11) %}
+                        {% set slot_id = LOCATION_PREFIXES[loc_name] + i|string %}
+                        {% set slot_name = slot_id %}
+                        {% set is_booked = slot_name in booked_slots %}
+                        <button type="button" 
+                                class="slot-item {% if is_booked %}slot-booked{% else %}slot-available{% endif %}"
+                                {% if not is_booked %}onclick="selectSlot('{{ slot_name }}', this)"{% endif %}
+                                title="Slot {{ slot_name }}{% if is_booked %} - Currently Booked{% endif %}">
+                            {{ slot_id }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                    <div class="slot-legend mt-4">
+                        <span class="legend-item"><span class="legend-color available"></span> Available</span>
+                        <span class="legend-item"><span class="legend-color booked"></span> Booked</span>
+                        <span class="legend-item"><span class="legend-color selected"></span> Selected</span>
+                    </div>
+                </div>
+                {% endfor %}
+                
+                <input type="hidden" name="slot" id="selected-slot" required>
+                <div id="selected-slot-display" class="alert alert-info hidden">
+                    <strong>Selected Slot:</strong> <span id="slot-display-text"></span>
+                    <button type="button" onclick="clearSlotSelection()" class="btn btn-sm btn-outline float-right">Change</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Vehicle Selection -->
+            <div class="card slide-up">
+                <div class="card-header">
+                    <h2 class="card-title">🚙 Step 2: Select Vehicle Type</h2>
+                </div>
+                
+                <div class="vehicle-grid">
+                    {% for vehicle, rate in vehicle_rates.items() %}
+                    {% set peak_rate = (rate * peak_multiplier) | round | int %}
+                    <button type="button" onclick="selectVehicle('{{ vehicle }}', {{ rate }}, this)"
+                            class="vehicle-card">
+                        <div class="vehicle-icon">
+                            {% if vehicle == 'Car' %}🚗
+                            {% elif vehicle == 'Bike' %}🏍️
+                            {% elif vehicle == 'Truck' %}🚛
+                            {% elif vehicle == 'SUV' %}🚙
+                            {% elif vehicle == 'Van' %}🚐
+                            {% endif %}
+                        </div>
+                        <div class="vehicle-name">{{ vehicle }}</div>
+                        <div class="vehicle-rate">
+                            <span class="current-rate">₹{{ peak_rate }}/hr</span>
+                            {% if is_peak %}
+                            <span class="original-rate">₹{{ rate }}/hr</span>
+                            {% endif %}
+                        </div>
+                    </button>
+                    {% endfor %}
+                </div>
+                
+                <input type="hidden" name="vehicle" id="selected-vehicle" required>
+                
+                <div class="form-group mt-6">
+                    <label for="vehicle_plate" class="form-label">🔢 Vehicle Number Plate (Optional)</label>
+                    <input type="text" id="vehicle_plate" name="vehicle_plate" 
+                           class="form-input" placeholder="e.g., TN01AB1234"
+                           style="text-transform: uppercase;">
+                </div>
+            </div>
+
+            <!-- Step 3: Duration & Timing -->
+            <div class="card slide-up">
+                <div class="card-header">
+                    <h2 class="card-title">⏰ Step 3: Duration & Timing</h2>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="form-group">
+                        <label for="start_time" class="form-label">🕐 Start Time</label>
+                        <input type="datetime-local" id="start_time" name="start_time" 
+                               class="form-input" onchange="updateEndTime()">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">🏁 End Time</label>
+                        <div id="end-time-display" class="form-input" style="background: #f8fafc; color: #64748b;">
+                            Select start time and duration
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="duration" class="form-label">⏳ Parking Duration</label>
+                    <div class="duration-presets mb-4">
+                        {% for hours in [1, 2, 3, 4, 6, 8, 12, 24] %}
+                        <button type="button" onclick="setDuration({{ hours }})"
+                                class="duration-btn {% if hours == 1 %}active{% endif %}">
+                            {{ hours }}h
+                        </button>
+                        {% endfor %}
+                    </div>
+                    <div class="duration-input-group">
+                        <button type="button" onclick="adjustDuration(-1)" class="duration-adjust">−</button>
+                        <input type="number" id="duration" name="duration" value="1" min="1" max="24" 
+                               class="duration-input" oninput="updatePrice(); updateEndTime(); syncDurationPresets()" required>
+                        <button type="button" onclick="adjustDuration(1)" class="duration-adjust">+</button>
+                        <span class="duration-label">hours</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4: Payment Method -->
+            <div class="card slide-up">
+                <div class="card-header">
+                    <h2 class="card-title">💳 Step 4: Payment Method</h2>
+                </div>
+                
+                <div class="payment-grid">
+                    {% for method in ['UPI', 'Card', 'Cash', 'Wallet'] %}
+                    <button type="button" onclick="selectPayment('{{ method }}', this)"
+                            class="payment-card {% if method == 'Cash' %}active{% endif %}">
+                        <div class="payment-icon">
+                            {% if method == 'UPI' %}📱
+                            {% elif method == 'Card' %}💳
+                            {% elif method == 'Cash' %}💵
+                            {% elif method == 'Wallet' %}👛
+                            {% endif %}
+                        </div>
+                        <div class="payment-name">{{ method }}</div>
+                    </button>
+                    {% endfor %}
+                </div>
+                
+                <input type="hidden" name="payment_method" id="payment-method" value="Cash">
+            </div>
+
+            <!-- Price Summary -->
+            <div class="price-summary-card">
+                <div class="price-summary-content">
+                    <div class="price-main">
+                        <div class="price-label">Total Amount</div>
+                        <div class="price-amount" id="price-display">₹0</div>
+                        <div class="price-breakdown" id="price-breakdown">Select vehicle and duration</div>
+                    </div>
+                    <div class="price-badges">
+                        {% if is_peak %}
+                        <span class="price-badge peak">⚡ Peak {{ peak_multiplier }}x</span>
+                        {% endif %}
+                        {% if loyalty_tier and loyalty_tier.discount > 0 %}
+                        <span class="price-badge loyalty">🏅 {{ loyalty_tier.discount }}% OFF</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" id="submit-btn" class="btn btn-primary btn-lg w-full" disabled>
+                <span class="btn-text">✅ Confirm Booking</span>
+                <div class="spinner hidden" id="submit-spinner"></div>
+            </button>
+        </form>
+    </div>
+</div>
+
+<style>
+/* Additional styles for booking page */
+.location-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.location-card {
+    background: white;
+    border: 2px solid var(--gray-300);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    text-align: center;
+}
+
+.location-card:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+}
+
+.location-card.active {
+    border-color: var(--primary-color);
+    background: var(--primary-color);
+    color: white;
+}
+
+.location-name {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.availability-bar {
+    height: 4px;
+    background: var(--gray-200);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.availability-fill {
+    height: 100%;
+    background: var(--success-color);
+    transition: width 0.3s ease;
+}
+
+.location-card.active .availability-bar {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.location-card.active .availability-fill {
+    background: rgba(255, 255, 255, 0.8);
+}
+
+.availability-text {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+}
+
+.location-card.active .availability-text {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.vehicle-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+.vehicle-card {
+    background: white;
+    border: 2px solid var(--gray-300);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    text-align: center;
+}
+
+.vehicle-card:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+}
+
+.vehicle-card.active {
+    border-color: var(--primary-color);
+    background: var(--primary-light);
+}
+
+.vehicle-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.vehicle-name {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.current-rate {
+    color: var(--primary-color);
+    font-weight: 700;
+}
+
+.original-rate {
+    text-decoration: line-through;
+    color: var(--gray-400);
+    font-size: 0.875rem;
+    margin-left: 0.5rem;
+}
+
+.duration-presets {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+    gap: 0.5rem;
+}
+
+.duration-btn {
+    padding: 0.5rem;
+    border: 2px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    background: white;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    font-weight: 600;
+}
+
+.duration-btn:hover {
+    border-color: var(--primary-color);
+}
+
+.duration-btn.active {
+    border-color: var(--primary-color);
+    background: var(--primary-color);
+    color: white;
+}
+
+.duration-input-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.duration-adjust {
+    width: 40px;
+    height: 40px;
+    border: 2px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    background: white;
+    cursor: pointer;
+    font-size: 1.25rem;
+    font-weight: bold;
+    transition: var(--transition-fast);
+}
+
+.duration-adjust:hover {
+    border-color: var(--primary-color);
+    background: var(--primary-light);
+}
+
+.duration-input {
+    flex: 1;
+    text-align: center;
+    font-weight: 600;
+    font-size: 1.125rem;
+}
+
+.duration-label {
+    color: var(--gray-500);
+    font-weight: 500;
+}
+
+.payment-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+}
+
+.payment-card {
+    background: white;
+    border: 2px solid var(--gray-300);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    text-align: center;
+}
+
+.payment-card:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+}
+
+.payment-card.active {
+    border-color: var(--primary-color);
+    background: var(--primary-light);
+}
+
+.payment-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.payment-name {
+    font-weight: 600;
+}
+
+.price-summary-card {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    border-radius: var(--radius-xl);
+    padding: 2rem;
+    color: white;
+    box-shadow: var(--shadow-xl);
+}
+
+.price-summary-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.price-main {
+    flex: 1;
+}
+
+.price-label {
+    font-size: 0.875rem;
+    opacity: 0.8;
+    margin-bottom: 0.5rem;
+}
+
+.price-amount {
+    font-size: 3rem;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+}
+
+.price-breakdown {
+    font-size: 0.875rem;
+    opacity: 0.8;
+}
+
+.price-badges {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.price-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.price-badge.peak {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+}
+
+.price-badge.loyalty {
+    background: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+}
+
+.slot-legend {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    font-size: 0.875rem;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+}
+
+.legend-color.available {
+    background: var(--success-color);
+}
+
+.legend-color.booked {
+    background: var(--gray-400);
+}
+
+.legend-color.selected {
+    background: var(--primary-color);
+}
+
+@media (max-width: 768px) {
+    .price-summary-content {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+    }
+    
+    .price-amount {
+        font-size: 2.5rem;
+    }
+    
+    .price-badges {
+        flex-direction: row;
+        justify-content: center;
+    }
+}
+</style>
+{% endblock %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <i class="fa-solid fa-circle-plus text-blue-600"></i>Book a Parking Slot
+            </h1>
+            <p class="text-slate-500 dark:text-slate-400 mt-1">20 locations · 200 total slots</p>
+        </div>
+        <div class="flex items-center gap-2">
+            {% if is_peak %}
+            <span class="flex items-center gap-1.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-semibold px-3 py-1.5 rounded-full">
+                <i class="fa-solid fa-bolt"></i>Peak {{ peak_multiplier }}x
+            </span>
+            {% endif %}
+            {% if loyalty_tier and loyalty_tier.discount > 0 %}
+            <span class="flex items-center gap-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold px-3 py-1.5 rounded-full">
+                <i class="fa-solid fa-medal"></i>{{ loyalty_tier.discount }}% off
+            </span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Quick Book Favourite -->
+    {% if favourite_slot %}
+    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid fa-star text-amber-500 text-lg"></i>
+            <div>
+                <div class="text-sm font-semibold text-amber-800 dark:text-amber-300">Favourite: {{ favourite_slot }}</div>
+                <div class="text-xs text-amber-600 dark:text-amber-400">Quick-book your saved slot</div>
+            </div>
+        </div>
+        <button onclick="quickBookFavourite('{{ favourite_slot }}')"
+            class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl text-sm transition-colors">
+            <i class="fa-solid fa-bolt mr-1"></i>Quick Book
+        </button>
+    </div>
+    {% endif %}
+
+    <form method="POST" id="booking-form" class="space-y-5">
+
+        <!-- Step 1: Location & Slot -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <h2 class="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">1</span>
+                Select Location & Slot
+            </h2>
+
+            <!-- Search -->
+            <div class="relative mb-4">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input type="text" id="loc-search" placeholder="Search location..." oninput="filterLocations(this.value)"
+                    class="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+            </div>
+
+            <!-- Location Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-4" id="location-tabs">
+                {% for loc_name, loc in locations.items() %}
+                {% set avail_pct = (loc.available / 10 * 100) | int %}
+                <button type="button" onclick="selectLocation('{{ loc_name }}')"
+                    class="loc-tab text-left px-3 py-2.5 rounded-xl border transition-all
+                    {% if loop.first %}bg-blue-600 text-white border-blue-600{% else %}bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:border-blue-400{% endif %}"
+                    data-loc="{{ loc_name }}" data-avail="{{ loc.available }}">
+                    <div class="text-xs font-bold truncate">{{ loc_name }}</div>
+                    <div class="flex items-center gap-1 mt-1">
+                        <div class="flex-1 h-1 rounded-full bg-slate-200 dark:bg-slate-600 overflow-hidden">
+                            <div class="h-1 rounded-full {% if avail_pct > 50 %}bg-emerald-500{% elif avail_pct > 20 %}bg-amber-500{% else %}bg-red-500{% endif %}"
+                                style="width:{{ avail_pct }}%"></div>
+                        </div>
+                        <span class="text-xs {% if loop.first %}text-blue-200{% else %}text-slate-400{% endif %}">{{ loc.available }}/10</span>
+                    </div>
+                </button>
+                {% endfor %}
+            </div>
+
+            <!-- Slot Grids -->
+            {% for loc_name, loc in locations.items() %}
+            <div class="slot-section {% if not loop.first %}hidden{% endif %}" id="slots-{{ loc_name | replace(' ', '_') }}">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        <i class="fa-solid fa-location-dot text-blue-500 mr-1"></i>{{ loc_name }}
+                    </span>
+                    <span class="text-xs text-slate-400">{{ loc.available }} of 10 available</span>
+                </div>
+                <div class="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                    {% for i in range(1, 11) %}
+                    {% set slot_name = loc_name + ' ' + loc.prefix + i|string %}
+                    {% set is_booked = slot_name in booked_slots %}
+                    <button type="button"
+                        onclick="{% if not is_booked %}selectSlot('{{ slot_name }}', this){% else %}openWaitlist('{{ slot_name }}'){% endif %}"
+                        class="slot-btn aspect-square rounded-xl flex flex-col items-center justify-center text-xs font-bold transition-all
+                        {% if is_booked %}bg-red-100 dark:bg-red-900/20 text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-200 cursor-pointer
+                        {% else %}bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700 hover:bg-emerald-100 cursor-pointer{% endif %}"
+                        title="{{ slot_name }}{% if is_booked %} — Booked (click to join waitlist){% endif %}">
+                        <i class="fa-solid {% if is_booked %}fa-lock{% else %}fa-car{% endif %} text-sm mb-0.5 {% if is_booked %}opacity-50{% endif %}"></i>
+                        <span>{{ loc.prefix }}{{ i }}</span>
+                    </button>
+                    {% endfor %}
+                </div>
+                <div class="flex items-center gap-4 mt-3 text-xs text-slate-500 dark:text-slate-400">
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 bg-emerald-200 rounded"></span>Available</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-200 rounded"></span>Booked (click = waitlist)</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 bg-blue-500 rounded"></span>Selected</span>
+                </div>
+            </div>
+            {% endfor %}
+
+            <input type="hidden" name="slot" id="selected-slot">
+            <div id="slot-display" class="mt-3 hidden">
+                <div class="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-700">
+                    <i class="fa-solid fa-location-dot text-blue-600 dark:text-blue-400"></i>
+                    <span class="text-sm font-semibold text-blue-700 dark:text-blue-300" id="slot-display-text"></span>
+                    <button type="button" onclick="clearSlot()" class="ml-auto text-blue-400 hover:text-blue-600">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Vehicle -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <h2 class="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">2</span>
+                Vehicle Details
+            </h2>
+            <div class="grid grid-cols-3 gap-3 mb-4">
+                {% for vehicle, rate in vehicle_rates.items() %}
+                {% set peak_rate = (rate * peak_multiplier) | round | int %}
+                <button type="button" onclick="selectVehicle('{{ vehicle }}', {{ rate }}, this)"
+                    class="vehicle-btn flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-slate-200 dark:border-slate-600 hover:border-blue-400 transition-all">
+                    <i class="fa-solid {% if vehicle == 'Car' %}fa-car{% elif vehicle == 'Bike' %}fa-motorcycle{% else %}fa-truck{% endif %} text-2xl text-slate-500 dark:text-slate-400"></i>
+                    <span class="font-semibold text-slate-700 dark:text-slate-300 text-sm">{{ vehicle }}</span>
+                    <div class="text-center">
+                        <div class="text-xs font-bold text-blue-600 dark:text-blue-400">₹{{ peak_rate }}/hr</div>
+                        {% if is_peak %}<div class="text-xs text-slate-400 line-through">₹{{ rate }}/hr</div>{% endif %}
+                    </div>
+                </button>
+                {% endfor %}
+            </div>
+            <input type="hidden" name="vehicle" id="selected-vehicle">
+            <div>
+                <label for="vehicle_plate" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                    <i class="fa-solid fa-hashtag mr-1 text-slate-400"></i>Vehicle Plate (optional)
+                </label>
+                <input id="vehicle_plate" type="text" name="vehicle_plate" placeholder="e.g. TN01AB1234"
+                    class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-800 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:border-blue-500 uppercase">
+            </div>
+        </div>
+
+        <!-- Step 3: Duration & Timing -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <h2 class="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">3</span>
+                Duration & Timing
+            </h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="start_time" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                        <i class="fa-solid fa-play mr-1 text-slate-400"></i>Start Time
+                    </label>
+                    <input type="datetime-local" id="start_time" name="start_time"
+                        class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-800 dark:text-white text-sm focus:outline-none focus:border-blue-500"
+                        oninput="updateEndTime()">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                        <i class="fa-solid fa-flag-checkered mr-1 text-slate-400"></i>End Time
+                    </label>
+                    <div id="end-time-display" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 text-sm">
+                        —
+                    </div>
+                </div>
+            </div>
+            <div>
+                <label for="duration" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                    <i class="fa-solid fa-hourglass-half mr-1 text-slate-400"></i>Duration
+                </label>
+                <div class="grid grid-cols-4 sm:grid-cols-8 gap-2 mb-3" id="duration-presets">
+                    {% for h in [1, 2, 3, 4, 6, 8, 12, 24] %}
+                    <button type="button" onclick="setDuration({{ h }})"
+                        class="dur-preset py-2 rounded-xl border text-sm font-semibold transition-all
+                        {% if h == 1 %}bg-blue-600 text-white border-blue-600{% else %}bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:border-blue-400{% endif %}">
+                        {{ h }}h
+                    </button>
+                    {% endfor %}
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="changeDuration(-1)" class="w-10 h-10 bg-slate-100 dark:bg-slate-700 rounded-xl flex items-center justify-center font-bold text-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">−</button>
+                    <input type="number" name="duration" id="duration" value="1" min="1" max="24" required oninput="updatePrice(); updateEndTime(); syncPresets()"
+                        class="flex-1 text-center px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-800 dark:text-white font-bold focus:outline-none focus:border-blue-500">
+                    <button type="button" onclick="changeDuration(1)" class="w-10 h-10 bg-slate-100 dark:bg-slate-700 rounded-xl flex items-center justify-center font-bold text-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">+</button>
+                    <span class="text-sm text-slate-500 dark:text-slate-400 ml-1">hour(s)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 4: Payment Method -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <h2 class="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">4</span>
+                Payment Method
+            </h2>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {% for method, icon, label in [('UPI','fa-mobile-screen-button','UPI'), ('Card','fa-credit-card','Card'), ('Cash','fa-money-bill-wave','Cash'), ('Wallet','fa-wallet','Wallet')] %}
+                <button type="button" onclick="selectPayment('{{ method }}', this)"
+                    class="pay-btn flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-slate-200 dark:border-slate-600 hover:border-blue-400 transition-all
+                    {% if method == 'Cash' %}border-blue-500 bg-blue-50 dark:bg-blue-900/20{% endif %}">
+                    <i class="fa-solid {{ icon }} text-2xl {% if method == 'Cash' %}text-blue-600 dark:text-blue-400{% else %}text-slate-500 dark:text-slate-400{% endif %}"></i>
+                    <span class="font-semibold text-sm {% if method == 'Cash' %}text-blue-700 dark:text-blue-300{% else %}text-slate-700 dark:text-slate-300{% endif %}">{{ label }}</span>
+                </button>
+                {% endfor %}
+            </div>
+            <input type="hidden" name="payment_method" id="payment-method" value="Cash">
+        </div>
+
+        <!-- Price Summary -->
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-5 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-blue-100 text-sm mb-1">Estimated Total</div>
+                    <div class="text-4xl font-bold" id="price-display">₹0</div>
+                    <div class="text-blue-200 text-sm mt-1" id="rate-info">Select vehicle & duration</div>
+                </div>
+                <div class="text-right space-y-1">
+                    <div class="text-xs text-blue-100" id="breakdown">—</div>
+                    {% if is_peak %}
+                    <div class="text-xs bg-amber-400/30 text-amber-200 px-2 py-0.5 rounded-full">⚡ Peak {{ peak_multiplier }}x</div>
+                    {% endif %}
+                    {% if loyalty_tier and loyalty_tier.discount > 0 %}
+                    <div class="text-xs bg-emerald-400/30 text-emerald-200 px-2 py-0.5 rounded-full">🏅 {{ loyalty_tier.discount }}% loyalty off</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" id="submit-btn" disabled
+            class="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-600 disabled:cursor-not-allowed text-white disabled:text-slate-400 font-bold rounded-2xl transition-all text-lg shadow-lg shadow-blue-500/25 hover:-translate-y-0.5 disabled:translate-y-0 disabled:shadow-none">
+            <i class="fa-solid fa-circle-check mr-2"></i>Confirm Booking
+        </button>
+    </form>
+</div>
+
+<!-- Waitlist Modal -->
+<div id="waitlist-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4" style="display:none">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm p-6 fade-in">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold text-slate-800 dark:text-white text-lg flex items-center gap-2">
+                <i class="fa-solid fa-clock-rotate-left text-amber-500"></i>Join Waitlist
+            </h3>
+            <button onclick="closeWaitlist()" class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">
+            Slot <strong id="wl-slot-name" class="text-slate-800 dark:text-white"></strong> is booked.
+            We'll auto-book it for you when it's free.
+        </p>
+        <div class="space-y-3 mb-5">
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Vehicle Type</label>
+                <select id="wl-vehicle" class="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-800 dark:text-white focus:outline-none focus:border-amber-500">
+                    <option value="Car">Car — ₹50/hr</option>
+                    <option value="Bike">Bike — ₹20/hr</option>
+                    <option value="Truck">Truck — ₹80/hr</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Duration (hours)</label>
+                <input type="number" id="wl-duration" value="1" min="1" max="24"
+                    class="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-800 dark:text-white focus:outline-none focus:border-amber-500">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Vehicle Plate (optional)</label>
+                <input type="text" id="wl-plate" placeholder="e.g. TN01AB1234"
+                    class="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-800 dark:text-white uppercase focus:outline-none focus:border-amber-500">
+            </div>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="closeWaitlist()" class="flex-1 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold rounded-xl text-sm hover:bg-slate-200 transition-colors">Cancel</button>
+            <button onclick="confirmWaitlist()" class="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl text-sm transition-colors">
+                <i class="fa-solid fa-clock-rotate-left mr-1"></i>Join Waitlist
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const rates = {{ vehicle_rates | tojson }};
+const peakMultiplier = {{ peak_multiplier | default(1.0) }};
+const loyaltyDiscount = {{ loyalty_tier.discount if loyalty_tier else 0 }};
+let selectedRate = 0;
+const waitlistSlot = "{{ waitlist_slot }}";
+
+function selectPayment(method, btn) {
+    document.querySelectorAll('.pay-btn').forEach(b => {
+        b.classList.remove('border-blue-500','bg-blue-50','dark:bg-blue-900/20');
+        b.classList.add('border-slate-200','dark:border-slate-600');
+        const ic = b.querySelector('i');
+        if (ic) { ic.classList.remove('text-blue-600','dark:text-blue-400'); ic.classList.add('text-slate-500','dark:text-slate-400'); }
+        const sp = b.querySelector('span');
+        if (sp) { sp.classList.remove('text-blue-700','dark:text-blue-300'); sp.classList.add('text-slate-700','dark:text-slate-300'); }
+    });
+    btn.classList.remove('border-slate-200','dark:border-slate-600');
+    btn.classList.add('border-blue-500','bg-blue-50','dark:bg-blue-900/20');
+    const ic = btn.querySelector('i');
+    if (ic) { ic.classList.remove('text-slate-500','dark:text-slate-400'); ic.classList.add('text-blue-600','dark:text-blue-400'); }
+    const sp = btn.querySelector('span');
+    if (sp) { sp.classList.remove('text-slate-700','dark:text-slate-300'); sp.classList.add('text-blue-700','dark:text-blue-300'); }
+    document.getElementById('payment-method').value = method;
+}
+
+function filterLocations(q) {
+    document.querySelectorAll('.loc-tab').forEach(btn => {
+        const loc = btn.dataset.loc.toLowerCase();
+        btn.style.display = loc.includes(q.toLowerCase()) ? '' : 'none';
+    });
+}
+
+function selectLocation(loc) {
+    document.querySelectorAll('.loc-tab').forEach(t => {
+        t.classList.remove('bg-blue-600','text-white','border-blue-600');
+        t.classList.add('bg-slate-50','dark:bg-slate-700','text-slate-700','dark:text-slate-300','border-slate-200','dark:border-slate-600');
+        const sp = t.querySelector('span');
+        if (sp) sp.className = 'text-xs text-slate-400';
+    });
+    const active = document.querySelector(`[data-loc="${loc}"]`);
+    if (active) {
+        active.classList.remove('bg-slate-50','dark:bg-slate-700','text-slate-700','dark:text-slate-300','border-slate-200','dark:border-slate-600');
+        active.classList.add('bg-blue-600','text-white','border-blue-600');
+        const sp = active.querySelector('span');
+        if (sp) sp.className = 'text-xs text-blue-200';
+    }
+    document.querySelectorAll('.slot-section').forEach(s => s.classList.add('hidden'));
+    const section = document.getElementById('slots-' + loc.replace(/ /g, '_'));
+    if (section) section.classList.remove('hidden');
+    clearSlot();
+}
+
+function selectSlot(name, btn) {
+    document.querySelectorAll('.slot-btn:not([disabled])').forEach(b => {
+        if (!b.querySelector('.fa-lock')) {
+            b.classList.remove('bg-blue-500','text-white','border-blue-500','scale-110');
+            b.classList.add('bg-emerald-50','text-emerald-700','border-emerald-200');
+        }
+    });
+    btn.classList.remove('bg-emerald-50','text-emerald-700','border-emerald-200');
+    btn.classList.add('bg-blue-500','text-white','border-blue-500','scale-110');
+    document.getElementById('selected-slot').value = name;
+    document.getElementById('slot-display-text').textContent = '📍 ' + name;
+    document.getElementById('slot-display').classList.remove('hidden');
+    checkSubmit();
+}
+
+function clearSlot() {
+    document.querySelectorAll('.slot-btn').forEach(b => {
+        if (!b.querySelector('.fa-lock')) {
+            b.classList.remove('bg-blue-500','text-white','border-blue-500','scale-110');
+            b.classList.add('bg-emerald-50','text-emerald-700','border-emerald-200');
+        }
+    });
+    document.getElementById('selected-slot').value = '';
+    document.getElementById('slot-display').classList.add('hidden');
+    checkSubmit();
+}
+
+function selectVehicle(v, rate, btn) {
+    document.querySelectorAll('.vehicle-btn').forEach(b => {
+        b.classList.remove('border-blue-500','bg-blue-50','dark:bg-blue-900/20');
+        b.classList.add('border-slate-200','dark:border-slate-600');
+        const ic = b.querySelector('i');
+        if (ic) { ic.classList.remove('text-blue-600','dark:text-blue-400'); ic.classList.add('text-slate-500','dark:text-slate-400'); }
+    });
+    btn.classList.remove('border-slate-200','dark:border-slate-600');
+    btn.classList.add('border-blue-500','bg-blue-50','dark:bg-blue-900/20');
+    const ic = btn.querySelector('i');
+    if (ic) { ic.classList.remove('text-slate-500','dark:text-slate-400'); ic.classList.add('text-blue-600','dark:text-blue-400'); }
+    document.getElementById('selected-vehicle').value = v;
+    selectedRate = rate;
+    updatePrice();
+    checkSubmit();
+}
+
+function changeDuration(delta) {
+    const inp = document.getElementById('duration');
+    inp.value = Math.max(1, Math.min(24, parseInt(inp.value || 1) + delta));
+    updatePrice();
+    updateEndTime();
+    syncPresets();
+}
+
+function setDuration(h) {
+    document.getElementById('duration').value = h;
+    updatePrice();
+    updateEndTime();
+    syncPresets();
+}
+
+function syncPresets() {
+    const cur = parseInt(document.getElementById('duration').value) || 0;
+    document.querySelectorAll('.dur-preset').forEach(btn => {
+        const h = parseInt(btn.textContent);
+        const active = h === cur;
+        btn.classList.remove('bg-blue-600','text-white','border-blue-600','bg-slate-50','dark:bg-slate-700','text-slate-600','dark:text-slate-300','border-slate-200','dark:border-slate-600','hover:border-blue-400');
+        if (active) {
+            btn.classList.add('bg-blue-600','text-white','border-blue-600');
+        } else {
+            btn.classList.add('bg-slate-50','dark:bg-slate-700','text-slate-600','dark:text-slate-300','border-slate-200','dark:border-slate-600','hover:border-blue-400');
+        }
+    });
+}
+
+function updateEndTime() {
+    const startVal = document.getElementById('start_time').value;
+    const dur = parseInt(document.getElementById('duration').value) || 0;
+    const el = document.getElementById('end-time-display');
+    if (!startVal || !dur) { el.textContent = '—'; return; }
+    const end = new Date(new Date(startVal).getTime() + dur * 3600000);
+    el.textContent = end.toLocaleString('en-IN', {dateStyle:'medium', timeStyle:'short'});
+    el.classList.add('text-slate-800','dark:text-white','font-semibold');
+}
+
+(function() {
+    const now = new Date();
+    now.setMinutes(Math.ceil(now.getMinutes() / 15) * 15, 0, 0);
+    const pad = n => String(n).padStart(2, '0');
+    document.getElementById('start_time').value =
+        `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    updateEndTime();
+})();
+
+function updatePrice() {
+    const dur = parseInt(document.getElementById('duration').value) || 0;
+    const base = selectedRate * dur;
+    const peak = Math.round(base * peakMultiplier);
+    const discount = Math.round(peak * loyaltyDiscount / 100);
+    const total = peak - discount;
+    document.getElementById('price-display').textContent = '₹' + total;
+    document.getElementById('rate-info').textContent = selectedRate ? `₹${selectedRate}/hr × ${dur}hr` : 'Select vehicle & duration';
+    let bd = selectedRate ? `Base ₹${base}` : '—';
+    if (peakMultiplier > 1 && selectedRate) bd += ` → ₹${peak} (peak)`;
+    if (discount > 0) bd += ` − ₹${discount} (loyalty)`;
+    document.getElementById('breakdown').textContent = bd;
+}
+
+function checkSubmit() {
+    const slot = document.getElementById('selected-slot').value;
+    const vehicle = document.getElementById('selected-vehicle').value;
+    document.getElementById('submit-btn').disabled = !(slot && vehicle);
+}
+
+function quickBookFavourite(slot) {
+    document.getElementById('selected-slot').value = slot;
+    document.getElementById('slot-display-text').textContent = '📍 ' + slot;
+    document.getElementById('slot-display').classList.remove('hidden');
+    checkSubmit();
+    showToast('Favourite slot selected: ' + slot, 'info');
+}
+
+let _wlSlot = '';
+function openWaitlist(slot) {
+    _wlSlot = slot;
+    document.getElementById('wl-slot-name').textContent = slot;
+    const m = document.getElementById('waitlist-modal');
+    m.style.display = 'flex'; m.classList.remove('hidden');
+}
+function closeWaitlist() {
+    const m = document.getElementById('waitlist-modal');
+    m.style.display = 'none'; m.classList.add('hidden');
+}
+function confirmWaitlist() {
+    const vehicle = document.getElementById('wl-vehicle').value;
+    const duration = parseInt(document.getElementById('wl-duration').value) || 1;
+    const plate = document.getElementById('wl-plate').value.trim().toUpperCase();
+    fetch(`/booking/waitlist/{{ username }}`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({slot: _wlSlot, vehicle, duration, vehicle_plate: plate})
+    }).then(r => r.json()).then(data => {
+        closeWaitlist();
+        showToast(data.message, data.success ? 'success' : 'error');
+    });
+}
+document.getElementById('waitlist-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeWaitlist(); });
+if (waitlistSlot) { setTimeout(() => openWaitlist(waitlistSlot), 400); }
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Global variables
+const vehicleRates = {{ vehicle_rates | tojson }};
+const peakMultiplier = {{ peak_multiplier | default(1.0) }};
+const loyaltyDiscount = {{ loyalty_tier.discount if loyalty_tier else 0 }};
+const locations = {{ locations | tojson }};
+let selectedVehicleRate = 0;
+let formData = {
+    slot: '',
+    vehicle: '',
+    vehicle_plate: '',
+    duration: 1,
+    start_time: '',
+    payment_method: 'Cash'
+};
+
+// Initialize form
+document.addEventListener('DOMContentLoaded', function() {
+    // Set default start time (next 15-minute interval)
+    setDefaultStartTime();
+    
+    // Load saved form data
+    loadFormData();
+    
+    // Update initial price
+    updatePrice();
+    
+    // Set up form persistence
+    setupFormPersistence();
+    
+    // Check submit button state
+    checkSubmitButton();
+});
+
+function setDefaultStartTime() {
+    const now = new Date();
+    // Round to next 15-minute interval
+    const minutes = Math.ceil(now.getMinutes() / 15) * 15;
+    now.setMinutes(minutes, 0, 0);
+    
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const mins = String(now.getMinutes()).padStart(2, '0');
+    
+    const dateTimeString = `${year}-${month}-${day}T${hours}:${mins}`;
+    document.getElementById('start_time').value = dateTimeString;
+    formData.start_time = dateTimeString;
+    updateEndTime();
+}
+
+function loadFormData() {
+    try {
+        const saved = localStorage.getItem('smartpark_booking_form');
+        if (saved) {
+            const data = JSON.parse(saved);
+            
+            // Restore form fields
+            if (data.vehicle_plate) {
+                document.getElementById('vehicle_plate').value = data.vehicle_plate;
+                formData.vehicle_plate = data.vehicle_plate;
+            }
+            
+            if (data.duration && data.duration >= 1 && data.duration <= 24) {
+                document.getElementById('duration').value = data.duration;
+                formData.duration = data.duration;
+                syncDurationPresets();
+            }
+            
+            if (data.payment_method) {
+                formData.payment_method = data.payment_method;
+                // Find and activate payment method
+                const paymentBtns = document.querySelectorAll('.payment-card');
+                paymentBtns.forEach(btn => {
+                    if (btn.textContent.trim().includes(data.payment_method)) {
+                        selectPayment(data.payment_method, btn);
+                    }
+                });
+            }
+        }
+    } catch (e) {
+        console.log('Could not load saved form data:', e);
+    }
+}
+
+function saveFormData() {
+    try {
+        localStorage.setItem('smartpark_booking_form', JSON.stringify(formData));
+    } catch (e) {
+        console.log('Could not save form data:', e);
+    }
+}
+
+function setupFormPersistence() {
+    // Save form data on input changes
+    document.getElementById('vehicle_plate').addEventListener('input', function() {
+        formData.vehicle_plate = this.value;
+        saveFormData();
+    });
+    
+    document.getElementById('duration').addEventListener('input', function() {
+        formData.duration = parseInt(this.value) || 1;
+        saveFormData();
+    });
+    
+    document.getElementById('start_time').addEventListener('change', function() {
+        formData.start_time = this.value;
+        saveFormData();
+    });
+}
+
+function selectLocation(locationName) {
+    // Update location tabs
+    document.querySelectorAll('.location-card').forEach(card => {
+        card.classList.remove('active');
+    });
+    
+    const activeCard = document.querySelector(`[data-location=\"${locationName}\"]`);
+    if (activeCard) {
+        activeCard.classList.add('active');
+    }
+    
+    // Show corresponding slot section
+    document.querySelectorAll('.slot-section').forEach(section => {
+        section.classList.add('hidden');
+    });
+    
+    const targetSection = document.getElementById(`slots-${locationName.replace(/ /g, '_')}`);
+    if (targetSection) {
+        targetSection.classList.remove('hidden');
+    }
+    
+    // Clear slot selection
+    clearSlotSelection();
+}
+
+function selectSlot(slotName, button) {
+    // Clear previous selection
+    document.querySelectorAll('.slot-item').forEach(item => {
+        item.classList.remove('slot-selected');
+    });
+    
+    // Select new slot
+    button.classList.add('slot-selected');
+    
+    // Update form data
+    formData.slot = slotName;
+    document.getElementById('selected-slot').value = slotName;
+    
+    // Show selection display
+    document.getElementById('slot-display-text').textContent = slotName;
+    document.getElementById('selected-slot-display').classList.remove('hidden');
+    
+    // Save and check submit
+    saveFormData();
+    checkSubmitButton();
+    
+    // Show success message
+    showNotification(`Slot ${slotName} selected!`, 'success');
+}
+
+function clearSlotSelection() {
+    document.querySelectorAll('.slot-item').forEach(item => {
+        item.classList.remove('slot-selected');
+    });
+    
+    formData.slot = '';
+    document.getElementById('selected-slot').value = '';
+    document.getElementById('selected-slot-display').classList.add('hidden');
+    
+    saveFormData();
+    checkSubmitButton();
+}
+
+function selectVehicle(vehicleType, rate, button) {
+    // Clear previous selection
+    document.querySelectorAll('.vehicle-card').forEach(card => {
+        card.classList.remove('active');
+    });
+    
+    // Select new vehicle
+    button.classList.add('active');
+    
+    // Update form data
+    formData.vehicle = vehicleType;
+    selectedVehicleRate = rate;
+    document.getElementById('selected-vehicle').value = vehicleType;
+    
+    // Update price
+    updatePrice();
+    
+    // Save and check submit
+    saveFormData();
+    checkSubmitButton();
+    
+    // Show success message
+    showNotification(`${vehicleType} selected!`, 'success');
+}
+
+function setDuration(hours) {
+    document.getElementById('duration').value = hours;
+    formData.duration = hours;
+    
+    syncDurationPresets();
+    updatePrice();
+    updateEndTime();
+    saveFormData();
+}
+
+function adjustDuration(delta) {
+    const currentDuration = parseInt(document.getElementById('duration').value) || 1;
+    const newDuration = Math.max(1, Math.min(24, currentDuration + delta));
+    
+    setDuration(newDuration);
+}
+
+function syncDurationPresets() {
+    const currentDuration = parseInt(document.getElementById('duration').value) || 1;
+    
+    document.querySelectorAll('.duration-btn').forEach(btn => {
+        const btnHours = parseInt(btn.textContent);
+        btn.classList.toggle('active', btnHours === currentDuration);
+    });
+}
+
+function selectPayment(method, button) {
+    // Clear previous selection
+    document.querySelectorAll('.payment-card').forEach(card => {
+        card.classList.remove('active');
+    });
+    
+    // Select new payment method
+    button.classList.add('active');
+    
+    // Update form data
+    formData.payment_method = method;
+    document.getElementById('payment-method').value = method;
+    
+    saveFormData();
+    
+    // Show success message
+    showNotification(`${method} payment selected!`, 'info');
+}
+
+function updatePrice() {
+    const duration = parseInt(document.getElementById('duration').value) || 1;
+    
+    if (!selectedVehicleRate) {
+        document.getElementById('price-display').textContent = '₹0';
+        document.getElementById('price-breakdown').textContent = 'Select vehicle and duration';
+        return;
+    }
+    
+    // Calculate pricing
+    const baseAmount = selectedVehicleRate * duration;
+    const peakAmount = Math.round(baseAmount * peakMultiplier);
+    const loyaltyDiscountAmount = Math.round(peakAmount * loyaltyDiscount / 100);
+    const finalAmount = peakAmount - loyaltyDiscountAmount;
+    
+    // Update display
+    document.getElementById('price-display').textContent = `₹${finalAmount}`;
+    
+    // Build breakdown text
+    let breakdown = `₹${selectedVehicleRate}/hr × ${duration}h = ₹${baseAmount}`;
+    if (peakMultiplier > 1) {
+        breakdown += ` → ₹${peakAmount} (peak)`;
+    }
+    if (loyaltyDiscountAmount > 0) {
+        breakdown += ` - ₹${loyaltyDiscountAmount} (loyalty)`;
+    }
+    
+    document.getElementById('price-breakdown').textContent = breakdown;
+}
+
+function updateEndTime() {
+    const startTime = document.getElementById('start_time').value;
+    const duration = parseInt(document.getElementById('duration').value) || 1;
+    
+    if (!startTime) {
+        document.getElementById('end-time-display').textContent = 'Select start time and duration';
+        return;
+    }
+    
+    const start = new Date(startTime);
+    const end = new Date(start.getTime() + (duration * 60 * 60 * 1000));
+    
+    const options = {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    };
+    
+    document.getElementById('end-time-display').textContent = end.toLocaleDateString('en-IN', options);
+    document.getElementById('end-time-display').style.color = '#1e293b';
+    document.getElementById('end-time-display').style.fontWeight = '600';
+}
+
+function checkSubmitButton() {
+    const submitBtn = document.getElementById('submit-btn');
+    const hasSlot = formData.slot && document.getElementById('selected-slot').value;
+    const hasVehicle = formData.vehicle && document.getElementById('selected-vehicle').value;
+    
+    const canSubmit = hasSlot && hasVehicle;
+    
+    submitBtn.disabled = !canSubmit;
+    
+    if (canSubmit) {
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        submitBtn.querySelector('.btn-text').textContent = '✅ Confirm Booking';
+    } else {
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        submitBtn.querySelector('.btn-text').textContent = '⏳ Complete Selection';
+    }
+}
+
+function showNotification(message, type = 'info') {
+    // Remove existing notifications
+    const existing = document.querySelector('.notification');
+    if (existing) {
+        existing.remove();
+    }
+    
+    // Create notification
+    const notification = document.createElement('div');
+    notification.className = 'notification';
+    notification.innerHTML = `
+        <div class=\"notification-content\">
+            <span class=\"notification-icon\">
+                ${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}
+            </span>
+            <span class=\"notification-message\">${message}</span>
+        </div>
+    `;
+    
+    // Add to page
+    document.body.appendChild(notification);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 3000);
+}
+
+// Form submission handling
+document.getElementById('booking-form').addEventListener('submit', function(e) {
+    const submitBtn = document.getElementById('submit-btn');
+    const spinner = document.getElementById('submit-spinner');
+    const btnText = submitBtn.querySelector('.btn-text');
+    
+    // Show loading state
+    submitBtn.disabled = true;
+    spinner.classList.remove('hidden');
+    btnText.textContent = '⏳ Processing...';
+    
+    // Clear saved form data on successful submission
+    setTimeout(() => {
+        localStorage.removeItem('smartpark_booking_form');
+    }, 1000);
+});
+
+// Initialize first location
+document.addEventListener('DOMContentLoaded', function() {
+    const firstLocation = Object.keys(locations)[0];
+    if (firstLocation) {
+        selectLocation(firstLocation);
+    }
+});
+
+// Auto-refresh slot availability every 30 seconds
+setInterval(function() {
+    fetch('/core/api/slots')
+        .then(response => response.json())
+        .then(data => {
+            // Update availability displays
+            Object.keys(data).forEach(locationName => {
+                const locationCard = document.querySelector(`[data-location=\"${locationName}\"]`);
+                if (locationCard) {
+                    const availabilityText = locationCard.querySelector('.availability-text');
+                    const availabilityFill = locationCard.querySelector('.availability-fill');
+                    
+                    if (availabilityText && availabilityFill) {
+                        const available = data[locationName].available;
+                        const total = data[locationName].total;
+                        const percentage = (available / total) * 100;
+                        
+                        availabilityText.textContent = `${available}/${total} available`;
+                        availabilityFill.style.width = `${percentage}%`;
+                    }
+                }
+            });
+        })
+        .catch(error => {
+            console.log('Could not refresh slot availability:', error);
+        });
+}, 30000);
+</script>
+
+<style>
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    padding: 16px 20px;
+    z-index: 1000;
+    max-width: 400px;
+    border-left: 4px solid var(--primary-color);
+    animation: slideInRight 0.3s ease-out;
+}
+
+.notification-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.notification-icon {
+    font-size: 1.25rem;
+}
+
+.notification-message {
+    font-weight: 500;
+    color: var(--gray-800);
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.btn-text {
+    transition: all 0.2s ease;
+}
+
+.opacity-50 {
+    opacity: 0.5;
+}
+
+.cursor-not-allowed {
+    cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+    .notification {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+}
+</style>
+{% endblock %}

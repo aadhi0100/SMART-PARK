@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+{% block title %}Reports & Analytics — SmartPark{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <i class="fa-solid fa-chart-bar text-blue-600"></i>Reports & Analytics
+            </h1>
+            <p class="text-slate-500 dark:text-slate-400 mt-1">System-wide statistics and insights</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="{{ url_for('admin.admin_export_bookings', username=username) }}"
+               class="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-colors text-sm">
+                <i class="fa-solid fa-file-csv"></i>Export CSV
+            </a>
+            <a href="{{ url_for('core.dashboard', username=username) }}"
+               class="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors text-sm">
+                <i class="fa-solid fa-arrow-left"></i>Back
+            </a>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-200 dark:border-slate-700">
+            <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center mb-3">
+                <i class="fa-solid fa-calendar-check text-blue-600 dark:text-blue-400"></i>
+            </div>
+            <div class="text-3xl font-bold text-slate-800 dark:text-white">{{ total_bookings }}</div>
+            <div class="text-sm text-slate-500 dark:text-slate-400 mt-1">Total Bookings</div>
+        </div>
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-200 dark:border-slate-700">
+            <div class="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center mb-3">
+                <i class="fa-solid fa-circle-check text-emerald-600 dark:text-emerald-400"></i>
+            </div>
+            <div class="text-3xl font-bold text-slate-800 dark:text-white">{{ active_bookings }}</div>
+            <div class="text-sm text-slate-500 dark:text-slate-400 mt-1">Active Now</div>
+        </div>
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-200 dark:border-slate-700">
+            <div class="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center mb-3">
+                <i class="fa-solid fa-users text-purple-600 dark:text-purple-400"></i>
+            </div>
+            <div class="text-3xl font-bold text-slate-800 dark:text-white">{{ total_users }}</div>
+            <div class="text-sm text-slate-500 dark:text-slate-400 mt-1">Active Users</div>
+        </div>
+        <div class="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-5 text-white">
+            <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-3">
+                <i class="fa-solid fa-indian-rupee-sign text-white"></i>
+            </div>
+            <div class="text-3xl font-bold">₹{{ total_revenue | int }}</div>
+            <div class="text-sm text-emerald-100 mt-1">Total Revenue</div>
+        </div>
+    </div>
+
+    <!-- Status breakdown -->
+    <div class="grid grid-cols-3 gap-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 text-center">
+            <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{{ active_bookings }}</div>
+            <div class="text-xs text-slate-400 mt-1">Active</div>
+        </div>
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 text-center">
+            <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ completed_bookings }}</div>
+            <div class="text-xs text-slate-400 mt-1">Completed</div>
+        </div>
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 text-center">
+            <div class="text-2xl font-bold text-red-600 dark:text-red-400">{{ cancelled_bookings }}</div>
+            <div class="text-xs text-slate-400 mt-1">Cancelled</div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Daily Revenue Chart -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <h3 class="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-chart-line text-blue-500"></i>Daily Revenue (Last 14 Days)
+            </h3>
+            <canvas id="revenueChart" height="200"></canvas>
+        </div>
+
+        <!-- Vehicle Breakdown -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <h3 class="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-chart-pie text-purple-500"></i>Revenue by Vehicle Type
+            </h3>
+            <canvas id="vehicleChart" height="200"></canvas>
+        </div>
+    </div>
+
+    <!-- Popular Slots -->
+    <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+        <h3 class="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+            <i class="fa-solid fa-trophy text-amber-500"></i>Top Parking Slots
+        </h3>
+        <div class="space-y-3">
+            {% for slot in popular_slots %}
+            {% set pct = (slot['count'] / popular_slots[0]['count'] * 100) if popular_slots else 0 %}
+            <div class="flex items-center gap-4">
+                <div class="w-6 text-center text-xs font-bold text-slate-400">{{ loop.index }}</div>
+                <div class="flex-1">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-sm font-medium text-slate-700 dark:text-slate-300">{{ slot['slot'] }}</span>
+                        <span class="text-xs font-bold text-slate-500 dark:text-slate-400">{{ slot['count'] }} bookings</span>
+                    </div>
+                    <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2">
+                        <div class="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-700" style="width:{{ pct }}%"></div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Peak vs Off-Peak & Forecast Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Hourly Heatmap -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <h3 class="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-clock text-purple-500"></i>Bookings by Hour
+            </h3>
+            <canvas id="hourlyChart" height="180"></canvas>
+        </div>
+
+        <!-- Revenue Forecast -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <h3 class="font-bold text-slate-800 dark:text-white mb-1 flex items-center gap-2">
+                <i class="fa-solid fa-chart-line text-emerald-500"></i>7-Day Revenue Forecast
+            </h3>
+            <p class="text-xs text-slate-400 mb-4">Based on 14-day moving average: <span class="font-semibold text-emerald-600 dark:text-emerald-400">₹{{ avg_daily_revenue }}/day</span></p>
+            <canvas id="forecastChart" height="180"></canvas>
+        </div>
+    </div>
+
+    <!-- Peak vs Off-Peak & Loyalty -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Peak vs Off-Peak -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <h3 class="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-bolt text-amber-500"></i>Peak vs Off-Peak Bookings
+            </h3>
+            {% for row in peak_stats %}
+            {% set label = 'Peak Hour' if row['peak_booking'] == 1 else 'Off-Peak' %}
+            {% set color = 'amber' if row['peak_booking'] == 1 else 'blue' %}
+            <div class="flex items-center justify-between p-3 bg-{{ color }}-50 dark:bg-{{ color }}-900/20 rounded-xl mb-3">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid {% if row['peak_booking'] == 1 %}fa-bolt text-amber-500{% else %}fa-moon text-blue-500{% endif %}"></i>
+                    <span class="font-semibold text-slate-700 dark:text-slate-300 text-sm">{{ label }}</span>
+                </div>
+                <div class="text-right">
+                    <div class="text-sm font-bold text-slate-800 dark:text-white">{{ row['cnt'] }} bookings</div>
+                    <div class="text-xs text-emerald-600 dark:text-emerald-400">₹{{ row['rev'] | int }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Loyalty Leaderboard -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <h3 class="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-medal text-yellow-500"></i>Loyalty Leaderboard
+            </h3>
+            <div class="space-y-2">
+                {% for u in loyalty_stats %}
+                {% set tier = 'Platinum' if u['loyalty_points'] >= 600 else ('Gold' if u['loyalty_points'] >= 300 else ('Silver' if u['loyalty_points'] >= 100 else 'Bronze')) %}
+                <div class="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-700 last:border-0">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-slate-400 w-5">{{ loop.index }}</span>
+                        <div class="w-7 h-7 bg-gradient-to-br from-purple-400 to-blue-400 rounded-lg flex items-center justify-center text-white text-xs font-bold">{{ u['username'][0].upper() }}</div>
+                        <span class="text-sm text-slate-700 dark:text-slate-300">{{ u['username'] }}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs px-2 py-0.5 rounded-full font-semibold
+                            {% if tier == 'Platinum' %}bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400
+                            {% elif tier == 'Gold' %}bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400
+                            {% elif tier == 'Silver' %}bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300
+                            {% else %}bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400{% endif %}">{{ tier }}</span>
+                        <span class="text-sm font-bold text-slate-800 dark:text-white">{{ u['loyalty_points'] }} pts</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Vehicle Revenue Table -->
+    <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+            <h3 class="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <i class="fa-solid fa-car text-slate-500"></i>Vehicle Type Breakdown
+            </h3>
+        </div>
+        <table class="w-full">
+            <thead>
+                <tr class="bg-slate-50 dark:bg-slate-700/50">
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Vehicle</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Bookings</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Revenue</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Avg/Booking</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                {% for row in revenue_by_vehicle %}
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                    <td class="px-6 py-4 text-sm font-medium text-slate-800 dark:text-white flex items-center gap-2">
+                        <i class="fa-solid {% if row['vehicle']=='Car' %}fa-car{% elif row['vehicle']=='Bike' %}fa-motorcycle{% else %}fa-truck{% endif %} text-slate-400"></i>
+                        {{ row['vehicle'] }}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{{ row['count'] }}</td>
+                    <td class="px-6 py-4 text-sm font-bold text-emerald-600 dark:text-emerald-400">₹{{ row['revenue'] | int }}</td>
+                    <td class="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">₹{{ (row['revenue'] / row['count']) | int if row['count'] else 0 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const isDark = document.documentElement.classList.contains('dark');
+const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+const textColor = isDark ? '#94a3b8' : '#64748b';
+
+// Daily Revenue Chart
+const dailyData = {{ daily_revenue | tojson }};
+new Chart(document.getElementById('revenueChart'), {
+    type: 'line',
+    data: {
+        labels: dailyData.map(d => d.day).reverse(),
+        datasets: [{
+            label: 'Revenue (₹)',
+            data: dailyData.map(d => d.rev).reverse(),
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59,130,246,0.1)',
+            borderWidth: 2.5,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: '#3b82f6',
+            pointRadius: 4,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { color: gridColor }, ticks: { color: textColor, maxTicksLimit: 7 } },
+            y: { grid: { color: gridColor }, ticks: { color: textColor, callback: v => '₹'+v } }
+        }
+    }
+});
+
+// Vehicle Pie Chart
+const vData = {{ revenue_by_vehicle | tojson }};
+new Chart(document.getElementById('vehicleChart'), {
+    type: 'doughnut',
+    data: {
+        labels: vData.map(d => d.vehicle),
+        datasets: [{
+            data: vData.map(d => d.revenue),
+            backgroundColor: ['#3b82f6','#10b981','#f59e0b'],
+            borderWidth: 0,
+            hoverOffset: 8
+        }]
+    },
+    options: {
+        responsive: true,
+        cutout: '65%',
+        plugins: {
+            legend: { position: 'bottom', labels: { color: textColor, padding: 16, usePointStyle: true } },
+            tooltip: { callbacks: { label: ctx => ` ₹${ctx.raw} (${ctx.label})` } }
+        }
+    }
+});
+
+// Hourly heatmap bar chart
+const hourlyData = {{ hourly_dist | tojson }};
+const allHours = Array.from({length: 24}, (_, i) => String(i).padStart(2,'0'));
+const hourlyMap = Object.fromEntries(hourlyData.map(d => [d.hr, d.cnt]));
+new Chart(document.getElementById('hourlyChart'), {
+    type: 'bar',
+    data: {
+        labels: allHours.map(h => h + ':00'),
+        datasets: [{
+            label: 'Bookings',
+            data: allHours.map(h => hourlyMap[h] || 0),
+            backgroundColor: allHours.map(h => {
+                const hr = parseInt(h);
+                return (hr >= 8 && hr < 10) || (hr >= 17 && hr < 20) ? 'rgba(245,158,11,0.8)' : 'rgba(59,130,246,0.6)';
+            }),
+            borderRadius: 4,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false },
+            tooltip: { callbacks: { label: ctx => `${ctx.raw} bookings` } }
+        },
+        scales: {
+            x: { grid: { display: false }, ticks: { color: textColor, maxTicksLimit: 12, font: { size: 10 } } },
+            y: { grid: { color: gridColor }, ticks: { color: textColor } }
+        }
+    }
+});
+
+// Revenue forecast (7 days ahead using avg)
+const avgDaily = {{ avg_daily_revenue }};
+const today = new Date();
+const forecastLabels = Array.from({length: 7}, (_, i) => {
+    const d = new Date(today); d.setDate(d.getDate() + i + 1);
+    return d.toISOString().slice(5, 10);
+});
+new Chart(document.getElementById('forecastChart'), {
+    type: 'line',
+    data: {
+        labels: forecastLabels,
+        datasets: [{
+            label: 'Forecast (₹)',
+            data: forecastLabels.map(() => avgDaily),
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16,185,129,0.1)',
+            borderWidth: 2.5,
+            borderDash: [6, 3],
+            fill: true,
+            tension: 0,
+            pointBackgroundColor: '#10b981',
+            pointRadius: 4,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { color: gridColor }, ticks: { color: textColor } },
+            y: { grid: { color: gridColor }, ticks: { color: textColor, callback: v => '₹'+v } }
+        }
+    }
+});
+</script>
+{% endblock %}

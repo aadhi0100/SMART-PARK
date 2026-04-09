@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+    <meta name="theme-color" content="#2563eb"/>
+    <meta name="mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+    <meta name="apple-mobile-web-app-title" content="SmartPark"/>
+    <title>{% block title %}Smart Parking{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: { colors: { brand: { 50:'#eff6ff',100:'#dbeafe',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af' } } } }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modern-style.css') }}"/>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak]{display:none!important}
+        .slide-in{animation:slideIn .3s ease}
+        @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+        .fade-in{animation:fadeIn .4s ease}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .pulse-dot{animation:pulseDot 2s infinite}
+        @keyframes pulseDot{0%,100%{opacity:1}50%{opacity:.4}}
+        ::-webkit-scrollbar{width:6px;height:6px}
+        ::-webkit-scrollbar-track{background:#f1f5f9}
+        ::-webkit-scrollbar-thumb{background:#94a3b8;border-radius:3px}
+        .dark ::-webkit-scrollbar-track{background:#1e293b}
+        .dark ::-webkit-scrollbar-thumb{background:#475569}
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body class="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen transition-colors duration-300">
+
+<!-- Navbar -->
+<nav class="bg-white dark:bg-slate-800 shadow-sm sticky top-0 z-50 border-b border-slate-200 dark:border-slate-700">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16">
+            <!-- Logo -->
+            <a href="{{ url_for('core.dashboard', username=session.get('username','')) }}" class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center shadow-md">
+                    <i class="fa-solid fa-square-parking text-white text-lg"></i>
+                </div>
+                <span class="font-bold text-lg text-slate-800 dark:text-white hidden sm:block">SmartPark</span>
+            </a>
+
+            <!-- Desktop Nav -->
+            {% if session.get('username') %}
+            <div class="hidden md:flex items-center gap-1">
+                <a href="{{ url_for('core.dashboard', username=session.get('username')) }}" class="nav-item px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <i class="fa-solid fa-gauge-high mr-1"></i>Dashboard
+                </a>
+                <a href="{{ url_for('booking.book', username=session.get('username')) }}" class="nav-item px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <i class="fa-solid fa-circle-plus mr-1"></i>Book
+                </a>
+                <a href="{{ url_for('booking.view_bookings', username=session.get('username')) }}" class="nav-item px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <i class="fa-solid fa-list-check mr-1"></i>Bookings
+                </a>
+                <a href="{{ url_for('map.parking_map', username=session.get('username')) }}" class="nav-item px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <i class="fa-solid fa-map-location-dot mr-1"></i>Map
+                </a>
+                {% if session.get('role') == 'admin' %}
+                <div class="relative group">
+                    <button class="px-3 py-2 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                        <i class="fa-solid fa-shield-halved mr-1"></i>Admin <i class="fa-solid fa-chevron-down text-xs ml-1"></i>
+                    </button>
+                    <div class="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                        <a href="{{ url_for('admin.admin_users', username=session.get('username')) }}" class="flex items-center gap-2 px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-t-xl"><i class="fa-solid fa-users w-4"></i>Users</a>
+                        <a href="{{ url_for('admin.admin_reports', username=session.get('username')) }}" class="flex items-center gap-2 px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"><i class="fa-solid fa-chart-bar w-4"></i>Reports</a>
+                        <a href="{{ url_for('admin.admin_waitlist', username=session.get('username')) }}" class="flex items-center gap-2 px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"><i class="fa-solid fa-clock-rotate-left w-4"></i>Waitlist</a>
+                        <a href="{{ url_for('admin.admin_cctv', username=session.get('username')) }}" class="flex items-center gap-2 px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-b-xl"><i class="fa-solid fa-video w-4"></i>CCTV</a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Right side -->
+            <div class="flex items-center gap-2">
+                <!-- Notifications -->
+                <div class="relative" id="notif-wrapper">
+                    <button onclick="toggleNotif()" class="relative p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                        <i class="fa-solid fa-bell text-lg"></i>
+                        <span id="notif-badge" class="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center hidden">0</span>
+                    </button>
+                    <div id="notif-panel" class="hidden absolute right-0 top-full mt-2 w-80 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 z-50 slide-in">
+                        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+                            <span class="font-semibold text-sm">Notifications</span>
+                            <button onclick="markAllRead()" class="text-xs text-blue-600 dark:text-blue-400 hover:underline">Mark all read</button>
+                        </div>
+                        <div id="notif-list" class="max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
+                            <div class="px-4 py-6 text-center text-slate-400 text-sm">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dark mode -->
+                <button onclick="toggleDark()" class="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" title="Toggle dark mode">
+                    <i class="fa-solid fa-moon dark:hidden text-lg"></i>
+                    <i class="fa-solid fa-sun hidden dark:block text-lg text-yellow-400"></i>
+                </button>
+
+                <!-- Profile -->
+                <div class="relative group">
+                    <button class="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                        <div class="w-7 h-7 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center text-white text-xs font-bold">
+                            {{ session.get('username','?')[0].upper() }}
+                        </div>
+                        <span class="text-sm font-medium hidden sm:block">{{ session.get('username') }}</span>
+                        <i class="fa-solid fa-chevron-down text-xs text-slate-400"></i>
+                    </button>
+                    <div class="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                        <a href="{{ url_for('core.profile', username=session.get('username')) }}" class="flex items-center gap-2 px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-t-xl"><i class="fa-solid fa-user w-4"></i>Profile</a>
+                        <a href="{{ url_for('core.logout') }}" class="flex items-center gap-2 px-4 py-3 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-b-xl"><i class="fa-solid fa-right-from-bracket w-4"></i>Logout</a>
+                    </div>
+                </div>
+
+                <!-- Mobile menu button -->
+                <button onclick="toggleMobileMenu()" class="md:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <i class="fa-solid fa-bars text-lg" id="menu-icon"></i>
+                </button>
+            </div>
+            {% else %}
+            <div class="flex items-center gap-2">
+                <button onclick="toggleDark()" class="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <i class="fa-solid fa-moon dark:hidden text-lg"></i>
+                    <i class="fa-solid fa-sun hidden dark:block text-lg text-yellow-400"></i>
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Mobile Menu -->
+    {% if session.get('username') %}
+    <div id="mobile-menu" class="hidden md:hidden border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 space-y-1">
+        <a href="{{ url_for('core.dashboard', username=session.get('username')) }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"><i class="fa-solid fa-gauge-high w-5"></i>Dashboard</a>
+        <a href="{{ url_for('booking.book', username=session.get('username')) }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"><i class="fa-solid fa-circle-plus w-5"></i>Book Parking</a>
+        <a href="{{ url_for('booking.view_bookings', username=session.get('username')) }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"><i class="fa-solid fa-list-check w-5"></i>My Bookings</a>
+        <a href="{{ url_for('map.parking_map', username=session.get('username')) }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"><i class="fa-solid fa-map-location-dot w-5"></i>Map</a>
+        <a href="{{ url_for('booking.slot_management', username=session.get('username')) }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"><i class="fa-solid fa-sliders w-5"></i>Slot Management</a>
+        {% if session.get('role') == 'admin' %}
+        <div class="border-t border-slate-200 dark:border-slate-700 pt-2 mt-2">
+            <p class="px-3 py-1 text-xs font-semibold text-red-500 uppercase tracking-wider">Admin</p>
+            <a href="{{ url_for('admin.admin_users', username=session.get('username')) }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"><i class="fa-solid fa-users w-5"></i>Users</a>
+            <a href="{{ url_for('admin.admin_reports', username=session.get('username')) }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"><i class="fa-solid fa-chart-bar w-5"></i>Reports</a>
+            <a href="{{ url_for('admin.admin_waitlist', username=session.get('username')) }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"><i class="fa-solid fa-clock-rotate-left w-5"></i>Waitlist</a>
+            <a href="{{ url_for('admin.admin_cctv', username=session.get('username')) }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"><i class="fa-solid fa-video w-5"></i>CCTV</a>
+        </div>
+        {% endif %}
+        <div class="border-t border-slate-200 dark:border-slate-700 pt-2 mt-2">
+            <a href="{{ url_for('core.profile', username=session.get('username')) }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"><i class="fa-solid fa-user w-5"></i>Profile</a>
+            <a href="{{ url_for('core.logout') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"><i class="fa-solid fa-right-from-bracket w-5"></i>Logout</a>
+        </div>
+    </div>
+    {% endif %}
+</nav>
+
+<!-- Toast -->
+<div id="toast-container" class="fixed top-20 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+
+<!-- Main Content -->
+<main class="fade-in min-h-[calc(100vh-4rem)] pt-8 pb-10">
+    {% block content %}{% endblock %}
+</main>
+
+<script>
+// Dark mode
+function toggleDark() {
+    const html = document.documentElement;
+    html.classList.toggle('dark');
+    localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light');
+}
+(function() {
+    const t = localStorage.getItem('theme');
+    if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+    }
+})();
+
+// Mobile menu
+function toggleMobileMenu() {
+    const m = document.getElementById('mobile-menu');
+    const i = document.getElementById('menu-icon');
+    m.classList.toggle('hidden');
+    i.className = m.classList.contains('hidden') ? 'fa-solid fa-bars text-lg' : 'fa-solid fa-xmark text-lg';
+}
+
+// Toast
+function showToast(msg, type='success') {
+    const c = document.getElementById('toast-container');
+    const t = document.createElement('div');
+    const colors = {success:'bg-emerald-500',error:'bg-red-500',info:'bg-blue-500',warning:'bg-amber-500'};
+    const icons = {success:'fa-circle-check',error:'fa-circle-xmark',info:'fa-circle-info',warning:'fa-triangle-exclamation'};
+    t.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl text-white text-sm font-medium shadow-xl slide-in ${colors[type]||colors.info} max-w-xs`;
+    t.innerHTML = `<i class="fa-solid ${icons[type]||icons.info}"></i><span>${msg}</span>`;
+    c.appendChild(t);
+    setTimeout(() => { t.style.opacity='0'; t.style.transition='opacity .3s'; setTimeout(()=>t.remove(),300); }, 3500);
+}
+
+// Notifications
+{%if session.get('username') %}
+const _username = "{{ session.get('username') }}";
+function toggleNotif() {
+    const p = document.getElementById('notif-panel');
+    p.classList.toggle('hidden');
+    if (!p.classList.contains('hidden')) loadNotifications();
+}
+document.addEventListener('click', e => {
+    const w = document.getElementById('notif-wrapper');
+    if (w && !w.contains(e.target)) document.getElementById('notif-panel').classList.add('hidden');
+});
+function loadNotifications() {
+    fetch(`/api/notifications/${_username}`)
+        .then(r => r.json())
+        .then(data => {
+            const list = document.getElementById('notif-list');
+            const badge = document.getElementById('notif-badge');
+            const unread = data.filter(n => !n.is_read).length;
+            if (unread > 0) { badge.textContent = unread > 9 ? '9+' : unread; badge.classList.remove('hidden'); }
+            else badge.classList.add('hidden');
+            if (!data.length) { list.innerHTML = '<div class="px-4 py-6 text-center text-slate-400 text-sm">No notifications</div>'; return; }
+            list.innerHTML = data.map(n => `
+                <div class="px-4 py-3 ${n.is_read ? '' : 'bg-blue-50 dark:bg-blue-900/20'}">
+                    <p class="text-sm text-slate-700 dark:text-slate-300">${n.message}</p>
+                    <p class="text-xs text-slate-400 mt-1">${n.created_at}</p>
+                </div>`).join('');
+        });
+}
+function markAllRead() {
+    fetch(`/api/notifications/read/${_username}`, {method:'POST'})
+        .then(() => { document.getElementById('notif-badge').classList.add('hidden'); loadNotifications(); });
+}
+// Poll unread count every 30s
+setInterval(() => {
+    fetch(`/api/notifications/${_username}`).then(r=>r.json()).then(data => {
+        const unread = data.filter(n=>!n.is_read).length;
+        const badge = document.getElementById('notif-badge');
+        if (unread > 0) { badge.textContent = unread > 9 ? '9+' : unread; badge.classList.remove('hidden'); }
+        else badge.classList.add('hidden');
+    });
+}, 30000);
+loadNotifications();
+{ % endif % }
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

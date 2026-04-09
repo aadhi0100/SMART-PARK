@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}Profile — SmartPark{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <h1 class="text-2xl font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
+        <i class="fa-solid fa-user-circle text-blue-600"></i>My Profile
+    </h1>
+
+    {% if msg %}
+    <div class="flex items-center gap-3 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl mb-6 text-emerald-700 dark:text-emerald-400 text-sm">
+        <i class="fa-solid fa-circle-check"></i><span>{{ msg }}</span>
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left: Avatar + Stats -->
+        <div class="space-y-4">
+            <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 text-center">
+                <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-white text-3xl font-bold shadow-lg">
+                    {{ username[0].upper() }}
+                </div>
+                <h2 class="text-xl font-bold text-slate-800 dark:text-white">{{ user['username'] }}</h2>
+                <div class="mt-2">
+                    {% if user['role'] == 'admin' %}
+                    <span class="inline-flex items-center gap-1 px-3 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-semibold rounded-full">
+                        <i class="fa-solid fa-shield-halved"></i>Admin
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-semibold rounded-full">
+                        <i class="fa-solid fa-user"></i>User
+                    </span>
+                    {% endif %}
+                </div>
+                <p class="text-xs text-slate-400 mt-3">Member since {{ user['created_at'][:10] if user['created_at'] else '—' }}</p>
+            </div>
+
+            <!-- Stats -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 space-y-4">
+                <h3 class="font-bold text-slate-700 dark:text-slate-300 text-sm uppercase tracking-wider">Statistics</h3>
+                <div class="flex items-center justify-between py-2.5 border-b border-slate-100 dark:border-slate-700">
+                    <span class="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2"><i class="fa-solid fa-calendar-check text-blue-500 w-4"></i>Total Bookings</span>
+                    <span class="font-bold text-slate-800 dark:text-white">{{ total_bookings }}</span>
+                </div>
+                <div class="flex items-center justify-between py-2.5 border-b border-slate-100 dark:border-slate-700">
+                    <span class="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2"><i class="fa-solid fa-indian-rupee-sign text-emerald-500 w-4"></i>Total Spent</span>
+                    <span class="font-bold text-emerald-600 dark:text-emerald-400">₹{{ total_spent | int }}</span>
+                </div>
+                {% if loyalty_tier %}
+                <div class="flex items-center justify-between py-2.5 border-b border-slate-100 dark:border-slate-700">
+                    <span class="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2"><i class="fa-solid fa-medal text-yellow-500 w-4"></i>Loyalty Points</span>
+                    <span class="font-bold text-yellow-600 dark:text-yellow-400">{{ loyalty_tier.points }}</span>
+                </div>
+                <div class="flex items-center justify-between py-2.5">
+                    <span class="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2"><i class="fa-solid fa-trophy text-purple-500 w-4"></i>Tier</span>
+                    <span class="font-bold
+                        {% if loyalty_tier.name == 'Platinum' %}text-purple-600 dark:text-purple-400
+                        {% elif loyalty_tier.name == 'Gold' %}text-yellow-600 dark:text-yellow-400
+                        {% elif loyalty_tier.name == 'Silver' %}text-slate-600 dark:text-slate-300
+                        {% else %}text-orange-600 dark:text-orange-400{% endif %}">{{ loyalty_tier.name }}</span>
+                </div>
+                {% if loyalty_tier.discount > 0 %}
+                <div class="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-3 text-center">
+                    <span class="text-sm font-semibold text-emerald-700 dark:text-emerald-400"><i class="fa-solid fa-tag mr-1"></i>{{ loyalty_tier.discount }}% discount on all bookings</span>
+                </div>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Right: Edit + Password -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Edit Profile -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+                <h3 class="font-bold text-slate-800 dark:text-white mb-5 flex items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square text-blue-500"></i>Edit Profile
+                </h3>
+                <form method="POST" class="space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="field-username" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Username</label>
+                            <input id="field-username" type="text" value="{{ user['username'] }}" disabled
+                                class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 text-sm cursor-not-allowed">
+                        </div>
+                        <div>
+                            <label for="field-userid" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">User ID</label>
+                            <input id="field-userid" type="text" value="#{{ user['id'] }}" disabled
+                                class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 text-sm cursor-not-allowed">
+                        </div>
+                        <div>
+                            <label for="field-email" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                                <i class="fa-solid fa-envelope mr-1 text-slate-400"></i>Email
+                            </label>
+                            <input id="field-email" type="email" name="email" value="{{ user['email'] or '' }}" placeholder="your@email.com"
+                                class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-800 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
+                        </div>
+                        <div>
+                            <label for="field-phone" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                                <i class="fa-solid fa-phone mr-1 text-slate-400"></i>Phone
+                            </label>
+                            <input id="field-phone" type="tel" name="phone" value="{{ user['phone'] or '' }}" placeholder="+91 XXXXX XXXXX"
+                                class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-800 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
+                        </div>
+                    </div>
+                    <button type="submit" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors text-sm">
+                        <i class="fa-solid fa-floppy-disk mr-1.5"></i>Save Changes
+                    </button>
+                </form>
+            </div>
+
+            <!-- Change Password -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+                <h3 class="font-bold text-slate-800 dark:text-white mb-5 flex items-center gap-2">
+                    <i class="fa-solid fa-lock text-amber-500"></i>Change Password
+                </h3>
+                <div id="pw-msg" class="hidden mb-4 p-3 rounded-xl text-sm"></div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Current Password</label>
+                        <div class="relative">
+                            <input type="password" id="cur-pw" placeholder="Enter current password"
+                                class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-800 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">New Password</label>
+                        <input type="password" id="new-pw" placeholder="Min 6 characters"
+                            class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-800 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
+                    </div>
+                    <button onclick="changePassword()" class="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-colors text-sm">
+                        <i class="fa-solid fa-key mr-1.5"></i>Update Password
+                    </button>
+                </div>
+            </div>
+
+            <!-- Recent Bookings -->
+            {% if recent_bookings %}
+            <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+                <h3 class="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-purple-500"></i>Recent Bookings
+                </h3>
+                <div class="space-y-2">
+                    {% for b in recent_bookings %}
+                    <div class="flex items-center justify-between py-2.5 border-b border-slate-100 dark:border-slate-700 last:border-0">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                                <i class="fa-solid {% if b['vehicle']=='Car' %}fa-car{% elif b['vehicle']=='Bike' %}fa-motorcycle{% else %}fa-truck{% endif %} text-blue-600 dark:text-blue-400 text-xs"></i>
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-slate-700 dark:text-slate-300">{{ b['slot'] }}</div>
+                                <div class="text-xs text-slate-400">{{ b['created_at'][:10] if b['created_at'] else '—' }}</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm font-bold text-emerald-600 dark:text-emerald-400">₹{{ b['amount_paid'] or 0 }}</div>
+                            <span class="text-xs {% if (b['status'] or 'active')=='active' %}text-emerald-500{% elif (b['status'] or 'active')=='cancelled' %}text-red-500{% else %}text-blue-500{% endif %}">
+                                {{ (b['status'] or 'active').title() }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function changePassword() {
+    const cur = document.getElementById('cur-pw').value;
+    const nw = document.getElementById('new-pw').value;
+    const msg = document.getElementById('pw-msg');
+    fetch('/auth/change_password/{{ username }}', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({current_password: cur, new_password: nw})
+    }).then(r=>r.json()).then(data => {
+        msg.classList.remove('hidden');
+        msg.className = `mb-4 p-3 rounded-xl text-sm ${data.success ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800'}`;
+        msg.innerHTML = `<i class="fa-solid ${data.success ? 'fa-circle-check' : 'fa-circle-exclamation'} mr-2"></i>${data.message}`;
+        if (data.success) { document.getElementById('cur-pw').value=''; document.getElementById('new-pw').value=''; }
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}CCTV Monitoring — SmartPark{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <i class="fa-solid fa-video text-red-600"></i>CCTV Monitoring
+            </h1>
+            <p class="text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
+                <span class="w-2 h-2 bg-emerald-500 rounded-full pulse-dot"></span>
+                4 cameras online
+            </p>
+        </div>
+        <a href="{{ url_for('core.dashboard', username=username) }}"
+           class="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors text-sm">
+            <i class="fa-solid fa-arrow-left"></i>Back
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {% set cameras = [
+            ('Entrance Gate', 'fa-door-open', 'emerald', 'bg-emerald-100 dark:bg-emerald-900/30', 'text-emerald-600 dark:text-emerald-400'),
+            ('Parking Area A', 'fa-square-parking', 'blue', 'bg-blue-100 dark:bg-blue-900/30', 'text-blue-600 dark:text-blue-400'),
+            ('Parking Area B', 'fa-square-parking', 'purple', 'bg-purple-100 dark:bg-purple-900/30', 'text-purple-600 dark:text-purple-400'),
+            ('Exit Gate', 'fa-door-closed', 'amber', 'bg-amber-100 dark:bg-amber-900/30', 'text-amber-600 dark:text-amber-400')
+        ] %}
+        {% for name, icon, color, bg_class, text_class in cameras %}
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden hover:shadow-lg transition-shadow">
+            <!-- Camera feed -->
+            <div class="relative bg-slate-900 h-52 flex items-center justify-center">
+                <div class="text-center text-slate-400">
+                    <i class="fa-solid {{ icon }} text-5xl mb-3 opacity-30"></i>
+                    <div class="text-sm">Live Feed Unavailable</div>
+                    <div class="text-xs opacity-50 mt-1">Connect camera hardware</div>
+                </div>
+                <!-- Overlay badges -->
+                <div class="absolute top-3 left-3 flex items-center gap-1.5 bg-black/60 backdrop-blur text-white text-xs px-2.5 py-1.5 rounded-lg">
+                    <span class="w-1.5 h-1.5 bg-red-500 rounded-full pulse-dot"></span>
+                    LIVE
+                </div>
+                <div class="absolute top-3 right-3 bg-black/60 backdrop-blur text-white text-xs px-2.5 py-1.5 rounded-lg">
+                    CAM {{ loop.index }}
+                </div>
+                <div class="absolute bottom-3 left-3 text-white text-xs bg-black/60 backdrop-blur px-2.5 py-1.5 rounded-lg">
+                    <i class="fa-solid fa-clock mr-1"></i><span class="cam-time">--:--:--</span>
+                </div>
+            </div>
+            <!-- Camera info -->
+            <div class="p-4 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 {{ bg_class }} rounded-xl flex items-center justify-center">
+                        <i class="fa-solid {{ icon }} {{ text_class }} text-sm"></i>
+                    </div>
+                    <div>
+                        <div class="font-semibold text-slate-800 dark:text-white text-sm">{{ name }}</div>
+                        <div class="text-xs text-slate-400">HD · 1080p</div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                    <span class="w-2 h-2 bg-emerald-500 rounded-full pulse-dot"></span>Online
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- System Status -->
+    <div class="mt-0 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
+        <h3 class="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+            <i class="fa-solid fa-server text-slate-500"></i>System Status
+        </h3>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div class="text-center p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl">
+                <div class="text-lg font-bold text-emerald-600 dark:text-emerald-400">4/4</div>
+                <div class="text-xs text-slate-400 mt-1">Cameras Online</div>
+            </div>
+            <div class="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+                <div class="text-lg font-bold text-blue-600 dark:text-blue-400">1080p</div>
+                <div class="text-xs text-slate-400 mt-1">Resolution</div>
+            </div>
+            <div class="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
+                <div class="text-lg font-bold text-purple-600 dark:text-purple-400">30fps</div>
+                <div class="text-xs text-slate-400 mt-1">Frame Rate</div>
+            </div>
+            <div class="text-center p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl">
+                <div class="text-lg font-bold text-amber-600 dark:text-amber-400">24/7</div>
+                <div class="text-xs text-slate-400 mt-1">Recording</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateTimes() {
+    const now = new Date().toLocaleTimeString();
+    document.querySelectorAll('.cam-time').forEach(el => el.textContent = now);
+}
+updateTimes();
+setInterval(updateTimes, 1000);
+</script>
+{% endblock %}

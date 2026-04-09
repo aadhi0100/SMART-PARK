@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: smartpark
+    env: python
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn --bind 0.0.0.0:$PORT run:app --workers 2 --timeout 120"
+    plan: free
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: APP_BASE_URL
+        value: https://smartpark.onrender.com
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: 587
+      - key: RENDER
+        value: true
+    healthCheckPath: /core/ping

@@ -1,0 +1,360 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — SmartPark{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Peak Pricing Alert -->
+    {% if is_peak %}
+    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-2xl p-4 flex items-center gap-3">
+        <div class="w-9 h-9 bg-amber-100 dark:bg-amber-900/40 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-bolt text-amber-600 dark:text-amber-400"></i>
+        </div>
+        <div>
+            <div class="font-semibold text-amber-800 dark:text-amber-300 text-sm">Peak Hour Pricing Active</div>
+            <div class="text-xs text-amber-600 dark:text-amber-400">Rates are 1.5× higher during peak hours (8–10 AM, 5–8 PM). Book off-peak to save!</div>
+        </div>
+        <a href="{{ url_for('booking.book', username=username) }}" class="ml-auto px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition-colors flex-shrink-0">Book Now</a>
+    </div>
+    {% endif %}
+
+    <!-- Welcome Banner -->
+    <div class="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 rounded-2xl p-6 sm:p-8 text-white relative overflow-hidden">
+        <div class="absolute inset-0 opacity-10">
+            <div class="absolute -top-8 -right-8 w-48 h-48 bg-white rounded-full blur-2xl"></div>
+            <div class="absolute -bottom-8 -left-8 w-64 h-64 bg-indigo-300 rounded-full blur-3xl"></div>
+        </div>
+        <div class="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-bold mb-1">Welcome back, {{ username }}! 👋</h1>
+                <p class="text-blue-100">Here's what's happening with your parking today.</p>
+                {% if loyalty_tier %}
+                <div class="mt-2 inline-flex items-center gap-2 bg-white/20 backdrop-blur rounded-lg px-3 py-1.5">
+                    <i class="fa-solid fa-medal text-yellow-300 text-sm"></i>
+                    <span class="text-sm font-semibold">{{ loyalty_tier.name }} Member</span>
+                    <span class="text-blue-200 text-xs">{{ loyalty_tier.points }} pts</span>
+                    {% if loyalty_tier.discount > 0 %}
+                    <span class="bg-yellow-400 text-yellow-900 text-xs font-bold px-1.5 py-0.5 rounded">{{ loyalty_tier.discount }}% OFF</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            <a href="{{ url_for('booking.book', username=username) }}"
+               class="inline-flex items-center gap-2 bg-white text-blue-700 font-semibold px-5 py-3 rounded-xl hover:bg-blue-50 transition-colors shadow-lg self-start sm:self-auto">
+                <i class="fa-solid fa-circle-plus"></i>Book a Slot
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-200 dark:border-slate-700 hover:shadow-lg transition-shadow">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
+                    <i class="fa-solid fa-calendar-check text-blue-600 dark:text-blue-400"></i>
+                </div>
+                <span class="text-xs font-medium text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 px-2 py-0.5 rounded-full">Active</span>
+            </div>
+            <div class="text-3xl font-bold text-slate-800 dark:text-white counter" data-target="{{ total_bookings }}">0</div>
+            <div class="text-sm text-slate-500 dark:text-slate-400 mt-1">My Bookings</div>
+        </div>
+
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-200 dark:border-slate-700 hover:shadow-lg transition-shadow">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center">
+                    <i class="fa-solid fa-square-parking text-emerald-600 dark:text-emerald-400"></i>
+                </div>
+                <span class="text-xs font-medium text-blue-600 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-0.5 rounded-full">Live</span>
+            </div>
+            <div class="text-3xl font-bold text-slate-800 dark:text-white counter" data-target="{{ available_slots }}">0</div>
+            <div class="text-sm text-slate-500 dark:text-slate-400 mt-1">Available Slots</div>
+        </div>
+
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-200 dark:border-slate-700 hover:shadow-lg transition-shadow">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center">
+                    <i class="fa-solid fa-clock text-purple-600 dark:text-purple-400"></i>
+                </div>
+                <span class="text-xs font-medium text-purple-600 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-400 px-2 py-0.5 rounded-full">Always</span>
+            </div>
+            <div class="text-3xl font-bold text-slate-800 dark:text-white">24/7</div>
+            <div class="text-sm text-slate-500 dark:text-slate-400 mt-1">Service Hours</div>
+        </div>
+
+        {% if revenue is not none %}
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-200 dark:border-slate-700 hover:shadow-lg transition-shadow">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-xl flex items-center justify-center">
+                    <i class="fa-solid fa-indian-rupee-sign text-amber-600 dark:text-amber-400"></i>
+                </div>
+                <span class="text-xs font-medium text-amber-600 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 rounded-full">Total</span>
+            </div>
+            <div class="text-3xl font-bold text-slate-800 dark:text-white">₹{{ revenue | int }}</div>
+            <div class="text-sm text-slate-500 dark:text-slate-400 mt-1">Revenue</div>
+        </div>
+        {% else %}
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-200 dark:border-slate-700 hover:shadow-lg transition-shadow">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-10 h-10 bg-rose-100 dark:bg-rose-900/30 rounded-xl flex items-center justify-center">
+                    <i class="fa-solid fa-location-dot text-rose-600 dark:text-rose-400"></i>
+                </div>
+                <span class="text-xs font-medium text-rose-600 bg-rose-100 dark:bg-rose-900/30 dark:text-rose-400 px-2 py-0.5 rounded-full">Areas</span>
+            </div>
+            <div class="text-3xl font-bold text-slate-800 dark:text-white">20</div>
+            <div class="text-sm text-slate-500 dark:text-slate-400 mt-1">Locations</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Quick Actions -->
+    <div>
+    <h2 class="text-lg font-bold text-slate-800 dark:text-white mb-4">Quick Actions</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <a href="{{ url_for('booking.book', username=username) }}"
+           class="group bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-xl transition-all duration-200 hover:-translate-y-1">
+            <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 group-hover:bg-blue-600 rounded-2xl flex items-center justify-center mb-4 transition-colors">
+                <i class="fa-solid fa-circle-plus text-blue-600 dark:text-blue-400 group-hover:text-white text-xl transition-colors"></i>
+            </div>
+            <h3 class="font-bold text-slate-800 dark:text-white mb-1">Book Slot</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400">Reserve your parking space</p>
+        </a>
+
+        <a href="{{ url_for('booking.view_bookings', username=username) }}"
+           class="group bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-600 hover:shadow-xl transition-all duration-200 hover:-translate-y-1">
+            <div class="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/30 group-hover:bg-emerald-600 rounded-2xl flex items-center justify-center mb-4 transition-colors">
+                <i class="fa-solid fa-list-check text-emerald-600 dark:text-emerald-400 group-hover:text-white text-xl transition-colors"></i>
+            </div>
+            <h3 class="font-bold text-slate-800 dark:text-white mb-1">My Bookings</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400">View & manage reservations</p>
+        </a>
+
+        <a href="{{ url_for('map.parking_map', username=username) }}"
+           class="group bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-xl transition-all duration-200 hover:-translate-y-1">
+            <div class="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 group-hover:bg-purple-600 rounded-2xl flex items-center justify-center mb-4 transition-colors">
+                <i class="fa-solid fa-map-location-dot text-purple-600 dark:text-purple-400 group-hover:text-white text-xl transition-colors"></i>
+            </div>
+            <h3 class="font-bold text-slate-800 dark:text-white mb-1">Parking Map</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400">View all locations</p>
+        </a>
+
+        <a href="{{ url_for('booking.slot_management', username=username) }}"
+           class="group bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 hover:border-amber-300 dark:hover:border-amber-600 hover:shadow-xl transition-all duration-200 hover:-translate-y-1">
+            <div class="w-12 h-12 bg-amber-100 dark:bg-amber-900/30 group-hover:bg-amber-600 rounded-2xl flex items-center justify-center mb-4 transition-colors">
+                <i class="fa-solid fa-sliders text-amber-600 dark:text-amber-400 group-hover:text-white text-xl transition-colors"></i>
+            </div>
+            <h3 class="font-bold text-slate-800 dark:text-white mb-1">Slot Management</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400">Manage & release slots</p>
+        </a>
+    </div>
+    </div>
+
+    <!-- Loyalty + Spending Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Loyalty Card -->
+        {% if loyalty_tier %}
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <h2 class="text-base font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-medal text-yellow-500"></i>Loyalty Program
+            </h2>
+            {% set tiers = [('Bronze', 0, 100), ('Silver', 100, 300), ('Gold', 300, 600), ('Platinum', 600, 600)] %}
+            <div class="flex items-center gap-4 mb-4">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl
+                    {% if loyalty_tier.name == 'Platinum' %}bg-purple-100 dark:bg-purple-900/30
+                    {% elif loyalty_tier.name == 'Gold' %}bg-yellow-100 dark:bg-yellow-900/30
+                    {% elif loyalty_tier.name == 'Silver' %}bg-slate-100 dark:bg-slate-700
+                    {% else %}bg-orange-100 dark:bg-orange-900/30{% endif %}">
+                    {% if loyalty_tier.name == 'Platinum' %}💎
+                    {% elif loyalty_tier.name == 'Gold' %}🥇
+                    {% elif loyalty_tier.name == 'Silver' %}🥈
+                    {% else %}🥉{% endif %}
+                </div>
+                <div>
+                    <div class="font-bold text-slate-800 dark:text-white text-lg">{{ loyalty_tier.name }}</div>
+                    <div class="text-sm text-slate-500 dark:text-slate-400">{{ loyalty_tier.points }} points earned</div>
+                    {% if loyalty_tier.discount > 0 %}
+                    <div class="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">{{ loyalty_tier.discount }}% discount on all bookings</div>
+                    {% endif %}
+                </div>
+            </div>
+            <!-- Progress to next tier -->
+            {% if loyalty_tier.name != 'Platinum' %}
+            {% set next_pts = 300 if loyalty_tier.name == 'Silver' else (600 if loyalty_tier.name == 'Gold' else 100) %}
+            {% set curr_min = 100 if loyalty_tier.name == 'Silver' else (300 if loyalty_tier.name == 'Gold' else 0) %}
+            {% set pct = ((loyalty_tier.points - curr_min) / (next_pts - curr_min) * 100) | int %}
+            <div class="text-xs text-slate-500 dark:text-slate-400 mb-1.5">{{ next_pts - loyalty_tier.points }} pts to next tier</div>
+            <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5">
+                <div class="bg-gradient-to-r from-yellow-400 to-amber-500 h-2.5 rounded-full transition-all duration-700" style="width:{{ [pct, 100]|min }}%"></div>
+            </div>
+            {% else %}
+            <div class="text-xs font-semibold text-purple-600 dark:text-purple-400">🎉 Maximum tier reached!</div>
+            {% endif %}
+            <div class="mt-4 grid grid-cols-4 gap-2 text-center">
+                {% for t_name, t_min, _ in [('Bronze','0',''), ('Silver','100',''), ('Gold','300',''), ('Platinum','600','')] %}
+                <div class="p-2 rounded-xl {% if loyalty_tier.name == t_name %}bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700{% else %}bg-slate-50 dark:bg-slate-700/50{% endif %}">
+                    <div class="text-xs font-semibold {% if loyalty_tier.name == t_name %}text-blue-600 dark:text-blue-400{% else %}text-slate-500 dark:text-slate-400{% endif %}">{{ t_name }}</div>
+                    <div class="text-xs text-slate-400">{{ t_min }}+</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Spending Trend -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <h2 class="text-base font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-chart-line text-blue-500"></i>My Spending (Last 7 Days)
+            </h2>
+            {% if spending_trend %}
+            <canvas id="spendingChart" height="160"></canvas>
+            {% else %}
+            <div class="flex flex-col items-center justify-center h-32 text-slate-400">
+                <i class="fa-solid fa-chart-line text-3xl mb-2 opacity-30"></i>
+                <span class="text-sm">No spending data yet</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Live Availability -->
+    <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+        <div class="flex items-center justify-between mb-5">
+            <h2 class="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <span class="w-2 h-2 bg-emerald-500 rounded-full pulse-dot"></span>
+                Live Slot Availability
+            </h2>
+            <button onclick="refreshSlots()" class="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
+                <i class="fa-solid fa-rotate-right" id="refresh-icon"></i> Refresh
+            </button>
+        </div>
+        <div id="slots-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+            <div class="col-span-full text-center py-4 text-slate-400 text-sm">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Admin Section -->
+    {% if role == 'admin' %}
+    <div class="bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-900/10 dark:to-rose-900/10 rounded-2xl border border-red-200 dark:border-red-800 p-6">
+        <h2 class="text-lg font-bold text-red-700 dark:text-red-400 mb-4 flex items-center gap-2">
+            <i class="fa-solid fa-shield-halved"></i>Admin Panel
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <a href="{{ url_for('admin.admin_users', username=username) }}"
+               class="flex items-center gap-4 bg-white dark:bg-slate-800 rounded-xl p-4 border border-red-200 dark:border-red-800 hover:shadow-lg transition-all hover:-translate-y-0.5">
+                <div class="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <i class="fa-solid fa-users text-red-600 dark:text-red-400"></i>
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-800 dark:text-white text-sm">User Management</div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400">Manage users & roles</div>
+                </div>
+            </a>
+            <a href="{{ url_for('admin.admin_reports', username=username) }}"
+               class="flex items-center gap-4 bg-white dark:bg-slate-800 rounded-xl p-4 border border-red-200 dark:border-red-800 hover:shadow-lg transition-all hover:-translate-y-0.5">
+                <div class="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <i class="fa-solid fa-chart-bar text-red-600 dark:text-red-400"></i>
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-800 dark:text-white text-sm">Reports & Analytics</div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400">Revenue & statistics</div>
+                </div>
+            </a>
+            <a href="{{ url_for('admin.admin_cctv', username=username) }}"
+               class="flex items-center gap-4 bg-white dark:bg-slate-800 rounded-xl p-4 border border-red-200 dark:border-red-800 hover:shadow-lg transition-all hover:-translate-y-0.5">
+                <div class="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <i class="fa-solid fa-video text-red-600 dark:text-red-400"></i>
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-800 dark:text-white text-sm">CCTV Monitoring</div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400">Live camera feeds</div>
+                </div>
+            </a>
+            <a href="{{ url_for('admin.admin_waitlist', username=username) }}"
+               class="flex items-center gap-4 bg-white dark:bg-slate-800 rounded-xl p-4 border border-red-200 dark:border-red-800 hover:shadow-lg transition-all hover:-translate-y-0.5">
+                <div class="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <i class="fa-solid fa-clock-rotate-left text-amber-600 dark:text-amber-400"></i>
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-800 dark:text-white text-sm">Waitlist</div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400">Manage slot waitlists</div>
+                </div>
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Animated counters
+document.querySelectorAll('.counter').forEach(el => {
+    const target = parseInt(el.dataset.target) || 0;
+    let current = 0;
+    const step = Math.max(1, Math.ceil(target / 30));
+    const timer = setInterval(() => {
+        current = Math.min(current + step, target);
+        el.textContent = current;
+        if (current >= target) clearInterval(timer);
+    }, 40);
+});
+
+// Live slots
+function refreshSlots() {
+    const icon = document.getElementById('refresh-icon');
+    icon.classList.add('animate-spin');
+    fetch('/api/slots')
+        .then(r => r.json())
+        .then(data => {
+            const grid = document.getElementById('slots-grid');
+            grid.innerHTML = Object.entries(data).map(([loc, info]) => {
+                const pct = Math.round((info.available / info.total) * 100);
+                const color = pct > 50 ? 'emerald' : pct > 20 ? 'amber' : 'red';
+                return `<div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4 border border-slate-200 dark:border-slate-600">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-300 truncate">${loc}</span>
+                        <span class="text-xs font-bold text-${color}-600 dark:text-${color}-400">${info.available}/${info.total}</span>
+                    </div>
+                    <div class="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-2">
+                        <div class="bg-${color}-500 h-2 rounded-full transition-all duration-500" style="width:${pct}%"></div>
+                    </div>
+                    <div class="text-xs text-slate-400 mt-1">${pct}% free</div>
+                </div>`;
+            }).join('');
+        })
+        .finally(() => icon.classList.remove('animate-spin'));
+}
+refreshSlots();
+setInterval(refreshSlots, 30000);
+
+// Spending trend chart
+{% if spending_trend %}
+const spendingData = {{ spending_trend | tojson }};
+const isDark = document.documentElement.classList.contains('dark');
+new Chart(document.getElementById('spendingChart'), {
+    type: 'bar',
+    data: {
+        labels: spendingData.map(d => d.day.slice(5)),
+        datasets: [{
+            label: 'Spent (₹)',
+            data: spendingData.map(d => d.total),
+            backgroundColor: 'rgba(59,130,246,0.7)',
+            borderRadius: 6,
+            borderSkipped: false,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { display: false }, ticks: { color: isDark ? '#94a3b8' : '#64748b', font: { size: 11 } } },
+            y: { grid: { color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }, ticks: { color: isDark ? '#94a3b8' : '#64748b', callback: v => '₹'+v } }
+        }
+    }
+});
+{% endif %}
+</script>
+{% endblock %}

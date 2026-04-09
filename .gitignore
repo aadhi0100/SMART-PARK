@@ -1,0 +1,24 @@
+.env
+*.db
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Logs and temp files
+*.log
+run_output.txt
+test_out.txt
+
+# Windows binaries and scripts
+*.exe
+*.bat
+
+# Local tunnel
+cloudflared.exe
