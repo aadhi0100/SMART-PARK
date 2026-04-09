@@ -61,6 +61,18 @@ def admin_reports(username):
         hourly_dist = conn.execute(
             "SELECT strftime('%H', created_at) as hr, COUNT(*) as cnt FROM bookings GROUP BY hr ORDER BY hr"
         ).fetchall()
+        peak_stats = conn.execute(
+            "SELECT peak_booking, COUNT(*) as cnt, COALESCE(SUM(amount_paid),0) as rev "
+            "FROM bookings GROUP BY peak_booking"
+        ).fetchall()
+        loyalty_stats = conn.execute(
+            "SELECT username, loyalty_points FROM users ORDER BY loyalty_points DESC LIMIT 10"
+        ).fetchall()
+        avg_daily_revenue = conn.execute(
+            "SELECT COALESCE(AVG(daily_rev),0) FROM "
+            "(SELECT DATE(created_at) as d, SUM(amount_paid) as daily_rev FROM bookings "
+            "GROUP BY DATE(created_at) ORDER BY d DESC LIMIT 14)"
+        ).fetchone()[0]
     finally:
         conn.close()
 
@@ -71,7 +83,10 @@ def admin_reports(username):
                            popular_slots=[dict(r) for r in popular_slots],
                            revenue_by_vehicle=[dict(r) for r in revenue_by_vehicle],
                            daily_revenue=[dict(r) for r in daily_revenue],
-                           hourly_dist=[dict(r) for r in hourly_dist])
+                           hourly_dist=[dict(r) for r in hourly_dist],
+                           peak_stats=[dict(r) for r in peak_stats],
+                           loyalty_stats=[dict(r) for r in loyalty_stats],
+                           avg_daily_revenue=round(avg_daily_revenue, 2))
 @admin_bp.route('/create_user/<username>', methods=['GET', 'POST'])
 def admin_create_user(username):
     if require_admin():

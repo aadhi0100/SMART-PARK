@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, session, redirect, url_for
-from ..core.database import get_db_connection
+from ..core.database import get_db_connection_legacy as get_db_connection
 from ..core.routes import LOCATIONS, LOCATION_PREFIXES, TOTAL_SLOTS_PER_LOC
 
 map_bp = Blueprint('map', __name__)

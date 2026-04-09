@@ -80,8 +80,8 @@ def validate_username(username: str) -> tuple[bool, str]:
     if not username[0].isalnum():
         return False, "Username must start with a letter or number"
     
-    # Reserved usernames
-    reserved = ['admin', 'root', 'system', 'api', 'www', 'mail', 'ftp', 'test']
+    # Reserved usernames (only block system-level names, not 'admin')
+    reserved = ['root', 'system', 'api', 'www', 'mail', 'ftp']
     if username.lower() in reserved:
         return False, "This username is reserved"
     
@@ -138,7 +138,7 @@ def validate_slot_id(slot_id: str) -> tuple[bool, str]:
     slot_id = slot_id.strip().upper()
     
     # Expected format: A1, B2, etc.
-    if not re.match(r'^[A-E][1-9]|[A-E]10$', slot_id):
+    if not re.match(r'^([A-E][1-9]|[A-E]10)$', slot_id):
         return False, "Invalid slot ID format (expected: A1-E10)"
     
     return True, ""

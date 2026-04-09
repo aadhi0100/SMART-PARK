@@ -2,6 +2,7 @@ services:
   - type: web
     name: smartpark
     env: python
+    rootDir: parking_system_final
     buildCommand: "./build.sh"
     startCommand: "gunicorn --bind 0.0.0.0:$PORT run:app --workers 2 --timeout 120"
     plan: free

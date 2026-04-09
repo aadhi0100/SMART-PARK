@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="light">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
@@ -177,7 +177,9 @@ function toggleDark() {
 }
 (function() {
     const t = localStorage.getItem('theme');
-    if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    if (t === 'light') {
+        document.documentElement.classList.remove('dark');
+    } else {
         document.documentElement.classList.add('dark');
     }
 })();
@@ -203,7 +205,7 @@ function showToast(msg, type='success') {
 }
 
 // Notifications
-{%if session.get('username') %}
+{% if session.get('username') %}
 const _username = "{{ session.get('username') }}";
 function toggleNotif() {
     const p = document.getElementById('notif-panel');
@@ -245,7 +247,7 @@ setInterval(() => {
     });
 }, 30000);
 loadNotifications();
-{ % endif % }
+{% endif %}
 </script>
 {% block scripts %}{% endblock %}
 </body>
